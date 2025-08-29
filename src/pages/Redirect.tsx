@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getLocationFromIP } from "@/utils/geoLocation";
 import { Loader2 } from "lucide-react";
 
 const Redirect = () => {
   const { qrId } = useParams();
-  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [startTime] = useState(Date.now());
 
   useEffect(() => {
     if (!qrId) {
@@ -58,6 +58,14 @@ const Redirect = () => {
           handleGeoRedirect(qrCode.geo_data);
           return;
 
+        case "vcard":
+        case "text":
+        case "event":
+          // These are handled directly by the QR code content
+          // No redirect needed, just show the content
+          handleDirectContent(qrCode.qr_type, qrCode.destination_url);
+          return;
+
         default:
           redirectUrl = qrCode.destination_url || "";
       }
@@ -82,6 +90,9 @@ const Redirect = () => {
 
   const logScan = async (qrCodeId: string) => {
     try {
+      // Calculate scan latency
+      const scanLatency = Date.now() - startTime;
+      
       // Get user's location and device info
       const userAgent = navigator.userAgent;
       const referrer = document.referrer;
@@ -94,7 +105,7 @@ const Redirect = () => {
       // Get location from IP address
       const locationData = await getLocationFromIP();
 
-      // Log the scan
+      // Log the scan with latency tracking
       await supabase.from("qr_scan_logs").insert({
         qr_code_id: qrCodeId,
         user_agent: userAgent,
@@ -102,6 +113,7 @@ const Redirect = () => {
         referrer: referrer || null,
         country: locationData.country,
         city: locationData.city,
+        scan_latency: scanLatency,
       });
     } catch (error) {
       console.error("Failed to log scan:", error);
@@ -181,6 +193,50 @@ const Redirect = () => {
     } else {
       setError("Unable to create location link");
       setLoading(false);
+    }
+  };
+
+  const handleDirectContent = (qrType: string, content: string) => {
+    if (!content) {
+      setError("No content available");
+      setLoading(false);
+      return;
+    }
+
+    if (qrType === "vcard") {
+      // For vCard, try to download or show content
+      const blob = new Blob([content], { type: "text/vcard" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contact.vcf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      // Show success message
+      setLoading(false);
+      setError("Contact downloaded successfully!");
+    } else if (qrType === "event") {
+      // For event, try to download or show content
+      const blob = new Blob([content], { type: "text/calendar" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "event.ics";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      // Show success message
+      setLoading(false);
+      setError("Event downloaded successfully!");
+    } else if (qrType === "text") {
+      // For text, show the content
+      setLoading(false);
+      setError(content); // We'll use the error state to show the text content
     }
   };
 

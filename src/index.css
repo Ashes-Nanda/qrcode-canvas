@@ -8,31 +8,31 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Material Design inspired color palette */
-    --background: 249 250 251 1; /* Cool gray-50 */
-    --foreground: 17 24 39 1; /* Gray-900 */
+    /* Design system color palette */
+    --background: 248 249 251 1; /* Off-white #F8F9FB */
+    --foreground: 28 28 28 1; /* Neutral dark #1C1C1C */
 
     --card: 255 255 255 1; /* Pure white for cards */
-    --card-foreground: 17 24 39 1;
+    --card-foreground: 28 28 28 1;
 
     --popover: 255 255 255 1;
-    --popover-foreground: 17 24 39 1;
+    --popover-foreground: 28 28 28 1;
 
-    /* Material Blue primary */
-    --primary: 211 86% 45%; /* Material Blue #1976D2 */
+    /* Deep indigo primary */
+    --primary: 240 45% 41%; /* Deep indigo #3B3B98 */
     --primary-foreground: 255 255 255 1;
-    --primary-hover: 211 86% 50%;
-    --primary-light: 211 86% 85%;
+    --primary-hover: 240 45% 46%;
+    --primary-light: 240 45% 85%;
 
-    /* Material Green accent */
-    --secondary: 142 69% 58%; /* Material Green #4CAF50 */
+    /* Bright teal accent */
+    --secondary: 174 100% 36%; /* Bright teal #00B8A9 */
     --secondary-foreground: 255 255 255 1;
-    --secondary-hover: 142 69% 63%;
+    --secondary-hover: 174 100% 41%;
 
-    /* Material Orange warm accent */
-    --accent: 36 100% 50%; /* Material Orange #FF9800 */
+    /* Coral accent */
+    --accent: 0 79% 70%; /* Coral #FF6B6B */
     --accent-foreground: 255 255 255 1;
-    --accent-hover: 36 100% 55%;
+    --accent-hover: 0 79% 75%;
 
     --muted: 241 245 249 1; /* Gray-100 */
     --muted-foreground: 100 116 139 1; /* Gray-500 */
@@ -124,8 +124,21 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', 'Neue Haas Grotesk', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
   }
+
+  /* Typography scale */
+  h1 { @apply text-2xl font-bold leading-tight; }
+  h2 { @apply text-xl font-bold leading-tight; }
+  h3 { @apply text-lg font-bold leading-tight; }
+  h4 { @apply text-base font-bold leading-tight; }
+  
+  /* Body text sizing */
+  .text-body { font-size: 0.95rem; line-height: 1.5; }
+  .text-body-lg { font-size: 1.1rem; line-height: 1.5; }
+  
+  /* Monospace for numbers */
+  .text-mono { font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace; }
 
   /* Material Design elevation classes */
   .elevation-1 {
@@ -157,5 +170,33 @@ All colors MUST be HSL.
   .ripple-effect:active {
     transform: scale(0.98);
     transition: transform 100ms ease-out;
+  }
+
+  /* Hover effects for interactive elements */
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Generous spacing utilities */
+  .spacing-generous {
+    padding: 1.5rem;
+  }
+
+  .spacing-generous-lg {
+    padding: 2rem;
+  }
+
+  /* Grid system utilities */
+  .grid-12 {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .grid-12 {
+      grid-template-columns: 1fr;
+    }
   }
 }

@@ -110,23 +110,35 @@ export const QRList = () => {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-6">
-              <div className="h-4 bg-muted rounded w-1/3 mb-2"></div>
-              <div className="h-3 bg-muted rounded w-2/3"></div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Manage QR Codes</h1>
+          <p className="text-gray-600">View and manage all your QR codes</p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse rounded-2xl">
+              <CardContent className="p-6">
+                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (qrCodes.length === 0) {
     return (
-      <Card className="elevation-2">
-        <CardContent className="p-12 text-center">
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Manage QR Codes</h1>
+          <p className="text-gray-600">View and manage all your QR codes</p>
+        </div>
+        <Card className="rounded-2xl shadow-md">
+          <CardContent className="p-12 text-center">
           <div className="text-muted-foreground">
             <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <h3 className="text-lg font-medium mb-2">No QR codes yet</h3>
@@ -134,21 +146,25 @@ export const QRList = () => {
           </div>
         </CardContent>
       </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Your QR Codes</h2>
-        <Badge variant="secondary" className="text-sm">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Manage QR Codes</h1>
+          <p className="text-gray-600">View and manage all your QR codes</p>
+        </div>
+        <Badge variant="secondary" className="text-sm px-3 py-1 rounded-xl">
           {qrCodes.length} total
         </Badge>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {qrCodes.map((qr) => (
-          <Card key={qr.id} className="elevation-2 smooth-transition hover:elevation-3">
+          <Card key={qr.id} className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
@@ -221,6 +237,18 @@ export const QRList = () => {
                 ) : qr.qr_type === 'geo' ? (
                   <div className="text-sm text-muted-foreground">
                     {qr.geo_data?.address || `${qr.geo_data?.latitude}, ${qr.geo_data?.longitude}`}
+                  </div>
+                ) : qr.qr_type === 'vcard' ? (
+                  <div className="text-sm text-muted-foreground">
+                    Contact card for {qr.destination_url?.match(/FN:([^\n\r]+)/)?.[1] || 'Unknown'}
+                  </div>
+                ) : qr.qr_type === 'text' ? (
+                  <div className="text-sm text-muted-foreground">
+                    <span className="truncate">{qr.destination_url?.substring(0, 50)}{qr.destination_url && qr.destination_url.length > 50 ? '...' : ''}</span>
+                  </div>
+                ) : qr.qr_type === 'event' ? (
+                  <div className="text-sm text-muted-foreground">
+                    Event: {qr.destination_url?.match(/SUMMARY:([^\n\r]+)/)?.[1] || 'Unknown Event'}
                   </div>
                 ) : null}
                 

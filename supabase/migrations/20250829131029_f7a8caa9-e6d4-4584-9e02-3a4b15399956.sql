@@ -34,7 +34,7 @@ CREATE TABLE public.qr_codes (
   user_id UUID NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
-  qr_type TEXT NOT NULL CHECK (qr_type IN ('static', 'dynamic', 'multi-url', 'action', 'geo')),
+  qr_type TEXT NOT NULL CHECK (qr_type IN ('static', 'dynamic', 'multi-url', 'action', 'geo', 'vcard', 'text', 'event')),
   destination_url TEXT,
   multi_urls JSONB,
   action_type TEXT,

@@ -11,6 +11,7 @@ interface AnalyticsData {
   totalScans: number;
   activeQRs: number;
   recentScans: number;
+  averageLatency: number;
   scansByDay: Array<{ date: string; scans: number }>;
   scansByDevice: Array<{ device: string; count: number; percentage: number }>;
   scansByCountry: Array<{ country: string; count: number }>;
@@ -23,18 +24,20 @@ export const Analytics = () => {
     totalScans: 0,
     activeQRs: 0,
     recentScans: 0,
+    averageLatency: 0,
     scansByDay: [],
     scansByDevice: [],
     scansByCountry: [],
     topQRs: [],
   });
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [reportingFrequency, setReportingFrequency] = useState<'hourly' | 'daily' | 'weekly' | 'monthly'>('daily');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchAnalytics();
-  }, [timeRange]);
+  }, [timeRange, reportingFrequency]);
 
   const fetchAnalytics = async () => {
     try {
@@ -75,8 +78,14 @@ export const Analytics = () => {
 
       const recentScans = scanLogs.length;
 
-      // Process scans by day
-      const scansByDay = processScansByDay(scanLogs, daysBack);
+      // Calculate average latency
+      const latencies = scanLogs.filter(log => log.scan_latency).map(log => log.scan_latency);
+      const averageLatency = latencies.length > 0 
+        ? Math.round(latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length)
+        : 0;
+
+      // Process scans by time period
+      const scansByDay = processScansByTimePeriod(scanLogs, daysBack, reportingFrequency);
       
       // Process scans by device
       const scansByDevice = processScansByDevice(scanLogs);
@@ -99,6 +108,7 @@ export const Analytics = () => {
         totalScans,
         activeQRs,
         recentScans,
+        averageLatency,
         scansByDay,
         scansByDevice,
         scansByCountry,
@@ -115,23 +125,93 @@ export const Analytics = () => {
     }
   };
 
-  const processScansByDay = (scanLogs: any[], daysBack: number) => {
-    const days = [];
-    for (let i = daysBack - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      const scansForDay = scanLogs.filter(log => 
-        log.scanned_at.startsWith(dateStr)
-      ).length;
-      
-      days.push({
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        scans: scansForDay
-      });
+  const processScansByTimePeriod = (scanLogs: any[], daysBack: number, frequency: string) => {
+    const periods = [];
+    
+    switch (frequency) {
+      case 'hourly':
+        // Last 24 hours by hour
+        for (let i = 23; i >= 0; i--) {
+          const date = new Date();
+          date.setHours(date.getHours() - i);
+          const hourStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours());
+          const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
+          
+          const scansForHour = scanLogs.filter(log => {
+            const scanTime = new Date(log.scanned_at);
+            return scanTime >= hourStart && scanTime < hourEnd;
+          }).length;
+          
+          periods.push({
+            date: hourStart.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+            scans: scansForHour
+          });
+        }
+        break;
+        
+      case 'weekly':
+        // Last weeks
+        const weeksToShow = Math.ceil(daysBack / 7);
+        for (let i = weeksToShow - 1; i >= 0; i--) {
+          const weekStart = new Date();
+          weekStart.setDate(weekStart.getDate() - (i * 7) - weekStart.getDay());
+          weekStart.setHours(0, 0, 0, 0);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekEnd.getDate() + 7);
+          
+          const scansForWeek = scanLogs.filter(log => {
+            const scanTime = new Date(log.scanned_at);
+            return scanTime >= weekStart && scanTime < weekEnd;
+          }).length;
+          
+          periods.push({
+            date: `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+            scans: scansForWeek
+          });
+        }
+        break;
+        
+      case 'monthly':
+        // Last months
+        const monthsToShow = Math.ceil(daysBack / 30);
+        for (let i = monthsToShow - 1; i >= 0; i--) {
+          const monthStart = new Date();
+          monthStart.setMonth(monthStart.getMonth() - i);
+          monthStart.setDate(1);
+          monthStart.setHours(0, 0, 0, 0);
+          const monthEnd = new Date(monthStart);
+          monthEnd.setMonth(monthEnd.getMonth() + 1);
+          
+          const scansForMonth = scanLogs.filter(log => {
+            const scanTime = new Date(log.scanned_at);
+            return scanTime >= monthStart && scanTime < monthEnd;
+          }).length;
+          
+          periods.push({
+            date: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+            scans: scansForMonth
+          });
+        }
+        break;
+        
+      default: // daily
+        for (let i = daysBack - 1; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
+          
+          const scansForDay = scanLogs.filter(log => 
+            log.scanned_at.startsWith(dateStr)
+          ).length;
+          
+          periods.push({
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            scans: scansForDay
+          });
+        }
     }
-    return days;
+    
+    return periods;
   };
 
   const processScansByDevice = (scanLogs: any[]) => {
@@ -175,16 +255,16 @@ export const Analytics = () => {
     icon: any;
     trend?: string;
   }) => (
-    <Card className="elevation-2 smooth-transition hover:elevation-3">
+    <Card className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
+        <CardTitle className="text-sm font-medium text-gray-600">
           {title}
         </CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <Icon className="h-4 w-4 text-primary" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value.toLocaleString()}</div>
-        <p className="text-xs text-muted-foreground">
+        <div className="text-2xl font-bold text-mono">{value.toLocaleString()}</div>
+        <p className="text-xs text-gray-500 mt-1">
           {description}
         </p>
         {trend && (
@@ -216,28 +296,42 @@ export const Analytics = () => {
   const COLORS = ['#1976D2', '#42A5F5', '#90CAF9', '#E3F2FD'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold mb-2">Analytics Overview</h2>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Analytics</h1>
+          <p className="text-gray-600">
             Track your QR code performance and engagement metrics
           </p>
         </div>
         
-        <Select value={timeRange} onValueChange={(value: '7d' | '30d' | '90d') => setTimeRange(value)}>
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7d">Last 7 days</SelectItem>
-            <SelectItem value="30d">Last 30 days</SelectItem>
-            <SelectItem value="90d">Last 90 days</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3">
+          <Select value={timeRange} onValueChange={(value: '7d' | '30d' | '90d') => setTimeRange(value)}>
+            <SelectTrigger className="w-36 rounded-xl border-gray-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={reportingFrequency} onValueChange={(value: 'hourly' | 'daily' | 'weekly' | 'monthly') => setReportingFrequency(value)}>
+            <SelectTrigger className="w-32 rounded-xl border-gray-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hourly">Hourly</SelectItem>
+              <SelectItem value="daily">Daily</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title="Total QR Codes"
           value={analytics.totalQRs}
@@ -267,13 +361,23 @@ export const Analytics = () => {
           icon={TrendingUp}
           trend={analytics.recentScans > 0 ? "↗ Active" : "No activity"}
         />
+        
+        <StatCard
+          title="Avg Latency"
+          value={analytics.averageLatency}
+          description="Milliseconds"
+          icon={TrendingUp}
+          trend={analytics.averageLatency < 500 ? "✓ Under 500ms" : "⚠ Over 500ms"}
+        />
       </div>
 
       {/* Scans Over Time Chart */}
-      <Card className="elevation-2">
+      <Card className="rounded-2xl shadow-md">
         <CardHeader>
-          <CardTitle>Scans Over Time</CardTitle>
-          <CardDescription>Daily scan activity for the selected period</CardDescription>
+          <CardTitle className="text-xl">Scans Over Time</CardTitle>
+          <CardDescription className="text-body">
+            {reportingFrequency.charAt(0).toUpperCase() + reportingFrequency.slice(1)} scan activity for the selected period
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {analytics.scansByDay.length > 0 ? (
@@ -297,13 +401,13 @@ export const Analytics = () => {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Device Analytics */}
-        <Card className="elevation-2">
+        <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl">
               <Smartphone className="h-5 w-5" />
               Device Types
             </CardTitle>
-            <CardDescription>Breakdown of scans by device type</CardDescription>
+            <CardDescription className="text-body">Breakdown of scans by device type</CardDescription>
           </CardHeader>
           <CardContent>
             {analytics.scansByDevice.length > 0 ? (
@@ -352,13 +456,13 @@ export const Analytics = () => {
         </Card>
 
         {/* Geographic Analytics */}
-        <Card className="elevation-2">
+        <Card className="rounded-2xl shadow-md">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl">
               <Globe className="h-5 w-5" />
               Geographic Distribution
             </CardTitle>
-            <CardDescription>Top countries by scan count</CardDescription>
+            <CardDescription className="text-body">Top countries by scan count</CardDescription>
           </CardHeader>
           <CardContent>
             {analytics.scansByCountry.length > 0 ? (
@@ -384,10 +488,10 @@ export const Analytics = () => {
       </div>
 
       {/* Top Performing QRs */}
-      <Card className="elevation-2">
+      <Card className="rounded-2xl shadow-md">
         <CardHeader>
-          <CardTitle>Top Performing QR Codes</CardTitle>
-          <CardDescription>Your most scanned QR codes</CardDescription>
+          <CardTitle className="text-xl">Top Performing QR Codes</CardTitle>
+          <CardDescription className="text-body">Your most scanned QR codes</CardDescription>
         </CardHeader>
         <CardContent>
           {analytics.topQRs.length > 0 ? (

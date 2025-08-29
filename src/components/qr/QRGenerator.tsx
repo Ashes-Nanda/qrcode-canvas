@@ -26,6 +26,26 @@ interface ActionData {
   message?: string;
 }
 
+interface VCardData {
+  firstName?: string;
+  lastName?: string;
+  organization?: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+}
+
+interface EventData {
+  title?: string;
+  description?: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  allDay?: boolean;
+}
+
 interface GeoData {
   latitude?: number;
   longitude?: number;
@@ -35,12 +55,15 @@ interface GeoData {
 export const QRGenerator = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [qrType, setQrType] = useState<'static' | 'dynamic' | 'multi-url' | 'action' | 'geo'>('static');
+  const [qrType, setQrType] = useState<'static' | 'dynamic' | 'multi-url' | 'action' | 'geo' | 'vcard' | 'text' | 'event'>('static');
   const [destinationUrl, setDestinationUrl] = useState('');
   const [multiUrls, setMultiUrls] = useState<MultiUrl[]>([{ url: '', weight: 1, label: '' }]);
   const [actionType, setActionType] = useState<'email' | 'phone' | 'sms'>('email');
   const [actionData, setActionData] = useState<ActionData>({});
   const [geoData, setGeoData] = useState<GeoData>({});
+  const [vCardData, setVCardData] = useState<VCardData>({});
+  const [textContent, setTextContent] = useState('');
+  const [eventData, setEventData] = useState<EventData>({});
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -108,6 +131,45 @@ export const QRGenerator = () => {
           return;
         }
         qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
+        break;
+        
+      case 'vcard':
+        if (!vCardData.firstName && !vCardData.lastName) {
+          toast({
+            title: "Error",
+            description: "Please enter at least a first or last name",
+            variant: "destructive",
+          });
+          return;
+        }
+        // For vCard, we'll encode directly
+        qrUrl = generateVCardString(vCardData);
+        break;
+        
+      case 'text':
+        if (!textContent.trim()) {
+          toast({
+            title: "Error",
+            description: "Please enter some text content",
+            variant: "destructive",
+          });
+          return;
+        }
+        // For text, we'll encode directly
+        qrUrl = textContent;
+        break;
+        
+      case 'event':
+        if (!eventData.title || !eventData.startDate) {
+          toast({
+            title: "Error",
+            description: "Please enter event title and start date",
+            variant: "destructive",
+          });
+          return;
+        }
+        // For event, we'll encode directly
+        qrUrl = generateEventString(eventData);
         break;
     }
 
@@ -190,6 +252,18 @@ export const QRGenerator = () => {
         case 'geo':
           qrData.geo_data = geoData;
           break;
+          
+        case 'vcard':
+          qrData.destination_url = generateVCardString(vCardData);
+          break;
+          
+        case 'text':
+          qrData.destination_url = textContent;
+          break;
+          
+        case 'event':
+          qrData.destination_url = generateEventString(eventData);
+          break;
       }
 
       const { data: savedQR, error } = await supabase
@@ -201,7 +275,7 @@ export const QRGenerator = () => {
       if (error) throw error;
 
       // Update the QR code with the actual redirect URL
-      if (qrType !== 'static') {
+      if (qrType !== 'static' && qrType !== 'vcard' && qrType !== 'text' && qrType !== 'event') {
         const actualUrl = `${window.location.origin}/qr/${savedQR.id}`;
         const updatedDataUrl = await QRCode.toDataURL(actualUrl, {
           width: 400,
@@ -232,6 +306,52 @@ export const QRGenerator = () => {
     }
   };
 
+  const generateVCardString = (data: VCardData): string => {
+    const vCard = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      data.firstName || data.lastName ? `FN:${(data.firstName || '')} ${(data.lastName || '')}`.trim() : '',
+      data.firstName ? `N:${data.lastName || ''};${data.firstName};;;` : '',
+      data.organization ? `ORG:${data.organization}` : '',
+      data.title ? `TITLE:${data.title}` : '',
+      data.phone ? `TEL:${data.phone}` : '',
+      data.email ? `EMAIL:${data.email}` : '',
+      data.website ? `URL:${data.website}` : '',
+      data.address ? `ADR:;;${data.address};;;;` : '',
+      'END:VCARD'
+    ].filter(line => line && !line.endsWith(':')).join('\n');
+    
+    return vCard;
+  };
+
+  const generateEventString = (data: EventData): string => {
+    const formatDate = (dateStr: string, allDay: boolean = false) => {
+      const date = new Date(dateStr);
+      if (allDay) {
+        return date.toISOString().split('T')[0].replace(/-/g, '');
+      }
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const event = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//QRCode Canvas Pro//Event//EN',
+      'BEGIN:VEVENT',
+      `SUMMARY:${data.title}`,
+      data.description ? `DESCRIPTION:${data.description}` : '',
+      data.location ? `LOCATION:${data.location}` : '',
+      `DTSTART:${formatDate(data.startDate!, data.allDay)}`,
+      data.endDate ? `DTEND:${formatDate(data.endDate, data.allDay)}` : '',
+      `DTSTAMP:${formatDate(new Date().toISOString())}`,
+      `UID:${Date.now()}@qrcode-canvas-pro.com`,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].filter(line => line && !line.endsWith(':')).join('\n');
+    
+    return event;
+  };
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -239,6 +359,9 @@ export const QRGenerator = () => {
     setMultiUrls([{ url: '', weight: 1, label: '' }]);
     setActionData({});
     setGeoData({});
+    setVCardData({});
+    setTextContent('');
+    setEventData({});
     setQrCodeDataUrl('');
   };
 
@@ -290,26 +413,32 @@ export const QRGenerator = () => {
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card className="elevation-2 smooth-transition hover:elevation-3">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-primary" />
-            QR Code Generator
-          </CardTitle>
-          <CardDescription>
-            Create static or dynamic QR codes for your URLs
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Create QR Code</h1>
+        <p className="text-gray-600">Generate professional QR codes for your business needs</p>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Card className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200">
+          <CardHeader className="pb-6">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <QrCode className="h-6 w-6 text-primary" />
+              QR Code Generator
+            </CardTitle>
+            <CardDescription className="text-body">
+              Create static or dynamic QR codes for your URLs
+            </CardDescription>
+          </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label htmlFor="title" className="text-sm font-medium">Title</Label>
             <Input
               id="title"
               placeholder="Enter QR code title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="smooth-transition"
+              className="rounded-xl border-gray-200 focus:border-primary focus:ring-primary/20"
             />
           </div>
 
@@ -327,7 +456,7 @@ export const QRGenerator = () => {
 
           <div className="space-y-2">
             <Label htmlFor="qr-type">QR Code Type</Label>
-            <Select value={qrType} onValueChange={(value: 'static' | 'dynamic' | 'multi-url' | 'action' | 'geo') => setQrType(value)}>
+            <Select value={qrType} onValueChange={(value: 'static' | 'dynamic' | 'multi-url' | 'action' | 'geo' | 'vcard' | 'text' | 'event') => setQrType(value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -337,6 +466,9 @@ export const QRGenerator = () => {
                 <SelectItem value="multi-url">Multi-URL QR Code</SelectItem>
                 <SelectItem value="action">Action QR Code</SelectItem>
                 <SelectItem value="geo">Geo-Tagged QR Code</SelectItem>
+                <SelectItem value="vcard">vCard Contact</SelectItem>
+                <SelectItem value="text">Plain Text</SelectItem>
+                <SelectItem value="event">Event Invite</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -513,11 +645,169 @@ export const QRGenerator = () => {
             </div>
           )}
 
+          {/* vCard Configuration */}
+          {qrType === 'vcard' && (
+            <div className="space-y-4">
+              <Label>Contact Information</Label>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">First Name *</Label>
+                  <Input
+                    placeholder="John"
+                    value={vCardData.firstName || ''}
+                    onChange={(e) => setVCardData({ ...vCardData, firstName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Last Name *</Label>
+                  <Input
+                    placeholder="Doe"
+                    value={vCardData.lastName || ''}
+                    onChange={(e) => setVCardData({ ...vCardData, lastName: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Organization</Label>
+                  <Input
+                    placeholder="Company Name"
+                    value={vCardData.organization || ''}
+                    onChange={(e) => setVCardData({ ...vCardData, organization: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Job Title</Label>
+                  <Input
+                    placeholder="CEO"
+                    value={vCardData.title || ''}
+                    onChange={(e) => setVCardData({ ...vCardData, title: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Phone</Label>
+                  <Input
+                    placeholder="+1234567890"
+                    value={vCardData.phone || ''}
+                    onChange={(e) => setVCardData({ ...vCardData, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Email</Label>
+                  <Input
+                    placeholder="john@example.com"
+                    value={vCardData.email || ''}
+                    onChange={(e) => setVCardData({ ...vCardData, email: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <Input
+                placeholder="Website (optional)"
+                value={vCardData.website || ''}
+                onChange={(e) => setVCardData({ ...vCardData, website: e.target.value })}
+              />
+              
+              <Input
+                placeholder="Address (optional)"
+                value={vCardData.address || ''}
+                onChange={(e) => setVCardData({ ...vCardData, address: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* Text Configuration */}
+          {qrType === 'text' && (
+            <div className="space-y-2">
+              <Label htmlFor="text-content">Text Content</Label>
+              <Textarea
+                id="text-content"
+                placeholder="Enter any text content you want to encode in the QR code..."
+                value={textContent}
+                onChange={(e) => setTextContent(e.target.value)}
+                rows={4}
+                className="smooth-transition"
+              />
+              <p className="text-xs text-muted-foreground">
+                This text will be displayed when the QR code is scanned
+              </p>
+            </div>
+          )}
+
+          {/* Event Configuration */}
+          {qrType === 'event' && (
+            <div className="space-y-4">
+              <Label>Event Details</Label>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Event Title *</Label>
+                <Input
+                  placeholder="Team Meeting"
+                  value={eventData.title || ''}
+                  onChange={(e) => setEventData({ ...eventData, title: e.target.value })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                  placeholder="Weekly team sync meeting"
+                  value={eventData.description || ''}
+                  onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs">Location</Label>
+                <Input
+                  placeholder="Conference Room A"
+                  value={eventData.location || ''}
+                  onChange={(e) => setEventData({ ...eventData, location: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Start Date & Time *</Label>
+                  <Input
+                    type="datetime-local"
+                    value={eventData.startDate || ''}
+                    onChange={(e) => setEventData({ ...eventData, startDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">End Date & Time</Label>
+                  <Input
+                    type="datetime-local"
+                    value={eventData.endDate || ''}
+                    onChange={(e) => setEventData({ ...eventData, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="all-day"
+                  checked={eventData.allDay || false}
+                  onChange={(e) => setEventData({ ...eventData, allDay: e.target.checked })}
+                  className="rounded"
+                />
+                <Label htmlFor="all-day" className="text-sm">All day event</Label>
+              </div>
+            </div>
+          )}
+
           <Button 
             onClick={generateQR} 
             disabled={loading}
-            className="w-full"
-            variant="hero"
+            className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
           >
             {loading ? (
               <>
@@ -531,29 +821,29 @@ export const QRGenerator = () => {
         </CardContent>
       </Card>
 
-      <Card className="elevation-2 smooth-transition hover:elevation-3">
-        <CardHeader>
-          <CardTitle>Preview & Download</CardTitle>
-          <CardDescription>
+      <Card className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-xl">Preview & Download</CardTitle>
+          <CardDescription className="text-body">
             Your generated QR code will appear here
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {qrCodeDataUrl ? (
             <div className="space-y-4">
-              <div className="flex justify-center">
+              <div className="flex justify-center p-6 bg-gray-50 rounded-2xl">
                 <img 
                   src={qrCodeDataUrl} 
                   alt="Generated QR Code" 
-                  className="border rounded-lg elevation-1"
+                  className="border border-gray-200 rounded-2xl shadow-sm"
                 />
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <Button 
                   onClick={downloadQR} 
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50"
                 >
                   <Download className="mr-2 h-4 w-4" />
                   Download
@@ -562,8 +852,7 @@ export const QRGenerator = () => {
                 <Button 
                   onClick={saveQR} 
                   disabled={saving}
-                  variant="secondary"
-                  className="flex-1"
+                  className="flex-1 bg-secondary hover:bg-secondary-hover text-white rounded-xl shadow-md"
                 >
                   {saving ? (
                     <>
@@ -590,6 +879,7 @@ export const QRGenerator = () => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

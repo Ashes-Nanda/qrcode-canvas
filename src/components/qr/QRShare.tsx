@@ -72,38 +72,39 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share QR Code</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="sm:max-w-md rounded-2xl bg-white border-gray-200 shadow-xl">
+        <DialogHeader className="space-y-3 pb-4">
+          <DialogTitle className="text-xl font-bold text-foreground">Share QR Code</DialogTitle>
+          <DialogDescription className="text-gray-600">
             Share your QR code with others using the link below
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-5">
           <div className="space-y-2">
-            <Label>QR Code Link</Label>
+            <Label className="text-sm font-medium text-foreground">QR Code Link</Label>
             <div className="flex gap-2">
               <Input
                 value={shareUrl}
                 readOnly
-                className="font-mono text-sm"
+                className="font-mono text-sm rounded-xl border-gray-200 h-10 px-3"
               />
               <Button
                 onClick={() => copyToClipboard(shareUrl)}
                 size="sm"
                 variant="outline"
+                className="rounded-xl border-gray-200 h-10 px-3"
               >
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <Button
               onClick={shareViaEmail}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 rounded-xl border-gray-200 h-10"
             >
               <Mail className="h-4 w-4" />
               Email
@@ -112,7 +113,7 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
             <Button
               onClick={shareViaSMS}
               variant="outline"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 rounded-xl border-gray-200 h-10"
             >
               <MessageSquare className="h-4 w-4" />
               SMS
@@ -122,8 +123,7 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
           {navigator.share && (
             <Button
               onClick={shareViaWebShare}
-              className="w-full"
-              variant="secondary"
+              className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl h-10 font-medium"
             >
               <Share2 className="h-4 w-4 mr-2" />
               Share via...

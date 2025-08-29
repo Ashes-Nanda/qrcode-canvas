@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Navigation } from '@/components/layout/Navigation';
+import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { QRGenerator } from '@/components/qr/QRGenerator';
 import { QRList } from '@/components/qr/QRList';
 import { Analytics } from '@/components/analytics/Analytics';
 import { useToast } from '@/hooks/use-toast';
-import { LogOut, Plus, BarChart3, List, User } from 'lucide-react';
-import heroImage from '@/assets/hero-qr.jpg';
 
 export const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -34,7 +32,7 @@ export const Dashboard = () => {
         throw error;
       }
 
-      setProfile(data);
+      setProfile({ ...data, email: user.email });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -46,82 +44,45 @@ export const Dashboard = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Signed out",
-        description: "You have been signed out successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <DashboardOverview 
+            onCreateClick={() => setActiveTab('create')}
+            onAnalyticsClick={() => setActiveTab('analytics')}
+          />
+        );
+      case 'create':
+        return <QRGenerator />;
+      case 'analytics':
+        return <Analytics />;
+      default:
+        return <DashboardOverview onCreateClick={() => setActiveTab('create')} onAnalyticsClick={() => setActiveTab('analytics')} />;
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-primary to-secondary">
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-20"
-          style={{ backgroundImage: `url(${heroImage})` }}
-        />
-        <div className="relative container mx-auto px-4 py-12">
-          <div className="flex justify-between items-start mb-8">
-            <div className="text-white">
-              <h1 className="text-4xl font-bold mb-2">QRCode Canvas Pro</h1>
-              <p className="text-xl opacity-90">
-                Welcome back, {profile?.full_name || 'User'}!
-              </p>
-              <p className="opacity-75">Create, manage, and track your QR codes</p>
-            </div>
-            <Button 
-              onClick={handleSignOut}
-              variant="outline"
-              className="text-white border-white hover:bg-white hover:text-primary"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
+      <Navigation 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        profile={profile}
+      />
+      
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="animate-fade-in">
+          {renderContent()}
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="create" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-            <TabsTrigger value="create" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create
-            </TabsTrigger>
-            <TabsTrigger value="manage" className="flex items-center gap-2">
-              <List className="h-4 w-4" />
-              Manage
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Analytics
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="create" className="animate-fade-in">
-            <QRGenerator />
-          </TabsContent>
-
-          <TabsContent value="manage" className="animate-fade-in">
-            <QRList />
-          </TabsContent>
-
-          <TabsContent value="analytics" className="animate-fade-in">
-            <Analytics />
-          </TabsContent>
-        </Tabs>
-      </div>
+      </main>
     </div>
   );
 };

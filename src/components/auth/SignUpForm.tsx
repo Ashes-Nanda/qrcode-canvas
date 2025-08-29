@@ -63,10 +63,10 @@ export const SignUpForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="fullName" className="flex items-center gap-2">
-          <User className="h-4 w-4" />
+        <Label htmlFor="fullName" className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <User className="h-4 w-4 text-primary" />
           Full Name
         </Label>
         <Input
@@ -76,13 +76,13 @@ export const SignUpForm = () => {
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
-          className="smooth-transition"
+          className="rounded-xl border-gray-200 h-12 px-4 focus:border-primary focus:ring-primary"
         />
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="signup-email" className="flex items-center gap-2">
-          <Mail className="h-4 w-4" />
+        <Label htmlFor="signup-email" className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Mail className="h-4 w-4 text-primary" />
           Email
         </Label>
         <Input
@@ -92,13 +92,13 @@ export const SignUpForm = () => {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="smooth-transition"
+          className="rounded-xl border-gray-200 h-12 px-4 focus:border-primary focus:ring-primary"
         />
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="signup-password" className="flex items-center gap-2">
-          <Lock className="h-4 w-4" />
+        <Label htmlFor="signup-password" className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Lock className="h-4 w-4 text-primary" />
           Password
         </Label>
         <Input
@@ -109,15 +109,14 @@ export const SignUpForm = () => {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          className="smooth-transition"
+          className="rounded-xl border-gray-200 h-12 px-4 focus:border-primary focus:ring-primary"
         />
       </div>
       
       <Button 
         type="submit" 
-        className="w-full" 
+        className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl h-12 font-medium shadow-md" 
         disabled={loading}
-        variant="hero"
       >
         {loading ? (
           <>
