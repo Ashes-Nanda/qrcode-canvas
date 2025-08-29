@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3 } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { QRShare } from './QRShare';
 import { format } from 'date-fns';
 
 interface QRCode {
@@ -14,6 +15,10 @@ interface QRCode {
   description?: string;
   qr_type: string;
   destination_url?: string;
+  multi_urls?: any;
+  action_type?: string;
+  action_data?: any;
+  geo_data?: any;
   is_active: boolean;
   scan_count: number;
   created_at: string;
@@ -195,10 +200,37 @@ export const QRList = () => {
             
             <CardContent>
               <div className="space-y-3">
-                {qr.destination_url && (
+                {/* Show different content based on QR type */}
+                {qr.qr_type === 'static' || qr.qr_type === 'dynamic' ? (
+                  qr.destination_url && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="truncate">{qr.destination_url}</span>
+                    </div>
+                  )
+                ) : qr.qr_type === 'multi-url' ? (
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium">{qr.multi_urls?.length || 0}</span> URLs configured
+                  </div>
+                ) : qr.qr_type === 'action' ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <ExternalLink className="h-4 w-4" />
-                    <span className="truncate">{qr.destination_url}</span>
+                    <span className="capitalize">{qr.action_type}</span> action
+                    {qr.action_data?.email && <span>→ {qr.action_data.email}</span>}
+                    {qr.action_data?.phone && <span>→ {qr.action_data.phone}</span>}
+                  </div>
+                ) : qr.qr_type === 'geo' ? (
+                  <div className="text-sm text-muted-foreground">
+                    {qr.geo_data?.address || `${qr.geo_data?.latitude}, ${qr.geo_data?.longitude}`}
+                  </div>
+                ) : null}
+                
+                {/* QR Code URL for sharing */}
+                {qr.qr_type !== 'static' && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <QrCode className="h-4 w-4" />
+                    <span className="truncate font-mono text-xs">
+                      {window.location.origin}/qr/{qr.id}
+                    </span>
                   </div>
                 )}
                 
@@ -211,6 +243,12 @@ export const QRList = () => {
                       Created: {format(new Date(qr.created_at), 'MMM d, yyyy')}
                     </span>
                   </div>
+                  
+                  <QRShare 
+                    qrId={qr.id} 
+                    title={qr.title} 
+                    qrType={qr.qr_type} 
+                  />
                 </div>
               </div>
             </CardContent>
