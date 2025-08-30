@@ -85,6 +85,27 @@ export const QRGenerator = () => {
           });
           return;
         }
+        
+        // Validate URL format and protocol
+        try {
+          const url = new URL(destinationUrl.startsWith('http') ? destinationUrl : `https://${destinationUrl}`);
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            toast({
+              title: "Error",
+              description: "Only HTTP and HTTPS URLs are allowed",
+              variant: "destructive",
+            });
+            return;
+          }
+        } catch {
+          toast({
+            title: "Error",
+            description: "Please enter a valid URL",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         // For dynamic QRs, we'll use our redirect service
         qrUrl = qrType === 'dynamic' ? `${window.location.origin}/qr/PLACEHOLDER` : destinationUrl;
         break;

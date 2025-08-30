@@ -144,7 +144,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      resolve_qr_and_log: {
+        Args: {
+          city?: string
+          country?: string
+          device_type?: string
+          qr_id: string
+          referrer?: string
+          user_agent?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
