@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { getLocationFromIP } from "@/utils/geoLocation";
 import { Loader2 } from "lucide-react";
 
 const Redirect = () => {
@@ -22,127 +21,78 @@ const Redirect = () => {
 
   const handleRedirect = async () => {
     try {
-      // Get QR code details
-      const { data: qrCode, error: qrError } = await supabase
-        .from("qr_codes")
-        .select("*")
-        .eq("id", qrId)
-        .eq("is_active", true)
-        .single();
-
-      if (qrError || !qrCode) {
-        throw new Error("QR code not found or inactive");
-      }
-
-      // Log the scan
-      await logScan(qrCode.id);
-
-      // Handle different QR types
-      let redirectUrl = "";
-
-      switch (qrCode.qr_type) {
-        case "static":
-        case "dynamic":
-          redirectUrl = qrCode.destination_url || "";
-          break;
-
-        case "multi-url":
-          redirectUrl = selectMultiUrl(qrCode.multi_urls);
-          break;
-
-        case "action":
-          handleAction(qrCode.action_type, qrCode.action_data);
-          return;
-
-        case "geo":
-          handleGeoRedirect(qrCode.geo_data);
-          return;
-
-        case "vcard":
-        case "text":
-        case "event":
-          // These are handled directly by the QR code content
-          // No redirect needed, just show the content
-          handleDirectContent(qrCode.qr_type, qrCode.destination_url);
-          return;
-
-        default:
-          redirectUrl = qrCode.destination_url || "";
-      }
-
-      if (redirectUrl) {
-        // Add protocol if missing
-        if (
-          !redirectUrl.startsWith("http://") &&
-          !redirectUrl.startsWith("https://")
-        ) {
-          redirectUrl = "https://" + redirectUrl;
-        }
-        window.location.href = redirectUrl;
-      } else {
-        throw new Error("No destination URL found");
-      }
-    } catch (error: any) {
-      setError(error.message);
-      setLoading(false);
-    }
-  };
-
-  const logScan = async (qrCodeId: string) => {
-    try {
-      // Calculate scan latency
-      const scanLatency = Date.now() - startTime;
-      
-      // Get user's location and device info
+      // Get user's device info
       const userAgent = navigator.userAgent;
       const referrer = document.referrer;
-
+      
       // Detect device type
       const deviceType = /Mobile|Android|iPhone|iPad/.test(userAgent)
         ? "mobile"
         : "desktop";
 
-      // Get location from IP address
-      const locationData = await getLocationFromIP();
-
-      // Log the scan with latency tracking
-      await supabase.from("qr_scan_logs").insert({
-        qr_code_id: qrCodeId,
+      // Call secure RPC function to resolve QR and log scan
+      const { data: result, error } = await supabase.rpc('resolve_qr_and_log', {
+        qr_id: qrId,
         user_agent: userAgent,
         device_type: deviceType,
         referrer: referrer || null,
-        country: locationData.country,
-        city: locationData.city,
-        scan_latency: scanLatency,
+        country: 'Unknown', // No longer using client-side geolocation
+        city: 'Unknown'
       });
-    } catch (error) {
-      console.error("Failed to log scan:", error);
-      // Don't block redirect if logging fails
-    }
-  };
 
-  const selectMultiUrl = (multiUrls: any): string => {
-    if (!multiUrls || !Array.isArray(multiUrls)) {
-      return "";
-    }
-
-    // Handle weighted selection
-    const totalWeight = multiUrls.reduce(
-      (sum, url) => sum + (url.weight || 1),
-      0
-    );
-    let random = Math.random() * totalWeight;
-
-    for (const url of multiUrls) {
-      random -= url.weight || 1;
-      if (random <= 0) {
-        return url.url;
+      if (error) {
+        console.error('RPC error:', error);
+        throw new Error("Unable to process QR code");
       }
-    }
 
-    // Fallback to first URL
-    return multiUrls[0]?.url || "";
+      // Parse the result safely
+      const response = result as any;
+      
+      if (response?.error) {
+        throw new Error("QR code not found or inactive");
+      }
+
+      // Handle response based on type
+      switch (response?.type) {
+        case "link":
+          let redirectUrl = response.url;
+          if (redirectUrl) {
+            // Add protocol if missing
+            if (
+              !redirectUrl.startsWith("http://") &&
+              !redirectUrl.startsWith("https://")
+            ) {
+              redirectUrl = "https://" + redirectUrl;
+            }
+            window.location.href = redirectUrl;
+          } else {
+            throw new Error("No destination URL found");
+          }
+          break;
+
+        case "action":
+          handleAction(response.action_type, response.action_data);
+          break;
+
+        case "geo":
+          handleGeoRedirect(response.geo_data);
+          break;
+
+        case "content":
+          handleDirectContent(response.content_type, response.content);
+          break;
+
+        default:
+          throw new Error("Unknown QR type");
+      }
+    } catch (error: any) {
+      console.error('Redirect error:', error);
+      setError("This QR code may be inactive, expired, or invalid.");
+      setLoading(false);
+    }
   };
+
+
 
   const handleAction = (actionType: string, actionData: any) => {
     switch (actionType) {
@@ -259,9 +209,6 @@ const Redirect = () => {
             QR Code Error
           </h1>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <p className="text-sm text-muted-foreground">
-            This QR code may be inactive, expired, or invalid.
-          </p>
         </div>
       </div>
     );
