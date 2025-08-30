@@ -2,62 +2,54 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { QrCode, Eye, TrendingUp, Plus, BarChart3, ExternalLink } from 'lucide-react';
-
-interface QRCodeData {
-  id: string;
-  title: string;
-  qr_type: string;
-  scan_count: number;
-  is_active: boolean;
-  created_at: string;
-}
+import { QrCode, BarChart3, Eye, TrendingUp, Plus, ArrowRight } from 'lucide-react';
+import { QRList } from '@/components/qr/QRList';
 
 interface DashboardOverviewProps {
   onCreateClick: () => void;
   onAnalyticsClick: () => void;
 }
 
+interface DashboardStats {
+  totalQRs: number;
+  activeQRs: number;
+  totalScans: number;
+  recentScans: number;
+}
+
 export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: DashboardOverviewProps) => {
-  const [qrCodes, setQrCodes] = useState<QRCodeData[]>([]);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalQRs: 0,
     activeQRs: 0,
     totalScans: 0,
-    recentScans: 0
+    recentScans: 0,
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboardStats();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardStats = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch QR codes
+      // Fetch QR codes stats
       const { data: qrData, error: qrError } = await supabase
         .from('qr_codes')
-        .select('id, title, qr_type, scan_count, is_active, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(6);
+        .select('id, scan_count, is_active')
+        .eq('user_id', user.id);
 
       if (qrError) throw qrError;
 
-      setQrCodes(qrData || []);
-
-      // Calculate stats
       const totalQRs = qrData?.length || 0;
       const activeQRs = qrData?.filter(qr => qr.is_active)?.length || 0;
       const totalScans = qrData?.reduce((sum, qr) => sum + (qr.scan_count || 0), 0) || 0;
 
-      // Get recent scans (last 7 days)
+      // Fetch recent scans (last 7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -71,16 +63,20 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
           .in('qr_code_id', qrIds)
           .gte('scanned_at', sevenDaysAgo.toISOString());
 
-        if (!scanError) {
-          recentScans = scanData?.length || 0;
-        }
+        if (scanError) throw scanError;
+        recentScans = scanData?.length || 0;
       }
 
-      setStats({ totalQRs, activeQRs, totalScans, recentScans });
+      setStats({
+        totalQRs,
+        activeQRs,
+        totalScans,
+        recentScans,
+      });
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to fetch dashboard data",
+        description: "Failed to fetch dashboard stats",
         variant: "destructive",
       });
     } finally {
@@ -88,101 +84,169 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
     }
   };
 
-  const getQRTypeColor = (type: string) => {
-    const colors = {
-      'static': 'bg-blue-100 text-blue-800',
-      'dynamic': 'bg-green-100 text-green-800',
-      'multi-url': 'bg-purple-100 text-purple-800',
-      'action': 'bg-orange-100 text-orange-800',
-      'geo': 'bg-red-100 text-red-800',
-      'vcard': 'bg-indigo-100 text-indigo-800',
-      'text': 'bg-gray-100 text-gray-800',
-      'event': 'bg-pink-100 text-pink-800'
-    };
-    return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const formatQRType = (type: string) => {
-    return type.split('-').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(' ');
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-              </CardContent>
-            </Card>
-          ))}
+  const StatCard = ({ 
+    title, 
+    value, 
+    description, 
+    icon: Icon,
+    trend,
+    onClick 
+  }: { 
+    title: string; 
+    value: number; 
+    description: string; 
+    icon: any;
+    trend?: string;
+    onClick?: () => void;
+  }) => (
+    <Card 
+      className={`rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 ${
+        onClick ? 'cursor-pointer hover:scale-[1.02]' : ''
+      }`}
+      onClick={onClick}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-600">
+          {title}
+        </CardTitle>
+        <Icon className="h-4 w-4 text-primary" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-mono">
+          {loading ? (
+            <div className="h-8 w-16 bg-gray-200 animate-pulse rounded"></div>
+          ) : (
+            value.toLocaleString()
+          )}
         </div>
-      </div>
-    );
-  }
+        <p className="text-xs text-gray-500 mt-1">
+          {description}
+        </p>
+        {trend && (
+          <div className="flex items-center mt-2 text-xs text-secondary">
+            <TrendingUp className="h-3 w-3 mr-1" />
+            {trend}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-8">
-      {/* Welcome Section */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-gray-600">Manage your QR codes and track performance</p>
+          <p className="text-gray-600">
+            Welcome back! Here's an overview of your QR code performance.
+          </p>
         </div>
-        <Button onClick={onCreateClick} className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md">
-          <Plus className="w-4 h-4 mr-2" />
+        
+        <Button 
+          onClick={onCreateClick}
+          className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+        >
+          <Plus className="h-4 w-4 mr-2" />
           Create QR Code
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total QR Codes</CardTitle>
-            <QrCode className="h-4 w-4 text-primary" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total QR Codes"
+          value={stats.totalQRs}
+          description="All time created"
+          icon={QrCode}
+        />
+        
+        <StatCard
+          title="Active QR Codes"
+          value={stats.activeQRs}
+          description="Currently active"
+          icon={Eye}
+          trend={`${stats.totalQRs > 0 ? Math.round((stats.activeQRs / stats.totalQRs) * 100) : 0}% of total`}
+        />
+        
+        <StatCard
+          title="Total Scans"
+          value={stats.totalScans}
+          description="All time scans"
+          icon={BarChart3}
+          onClick={onAnalyticsClick}
+        />
+        
+        <StatCard
+          title="Recent Scans"
+          value={stats.recentScans}
+          description="Last 7 days"
+          icon={TrendingUp}
+          trend={stats.recentScans > 0 ? "↗ Active" : "No recent activity"}
+          onClick={onAnalyticsClick}
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card 
+          className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02]"
+          onClick={onCreateClick}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Create New QR Code
+            </CardTitle>
+            <CardDescription>
+              Generate a new QR code for your business needs
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-mono">{stats.totalQRs}</div>
-            <p className="text-xs text-gray-500 mt-1">All time created</p>
+            <Button variant="ghost" className="w-full justify-between rounded-xl">
+              Get Started
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Active QR Codes</CardTitle>
-            <Eye className="h-4 w-4 text-secondary" />
+        <Card 
+          className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02]"
+          onClick={onAnalyticsClick}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              View Analytics
+            </CardTitle>
+            <CardDescription>
+              Track performance and engagement metrics
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-mono">{stats.activeQRs}</div>
-            <p className="text-xs text-gray-500 mt-1">Currently active</p>
+            <Button variant="ghost" className="w-full justify-between rounded-xl">
+              View Reports
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Scans</CardTitle>
-            <TrendingUp className="h-4 w-4 text-accent" />
+        <Card className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-primary" />
+              Quick Tips
+            </CardTitle>
+            <CardDescription>
+              Maximize your QR code effectiveness
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-mono">{stats.totalScans}</div>
-            <p className="text-xs text-gray-500 mt-1">All time scans</p>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Recent Scans</CardTitle>
-            <BarChart3 className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-mono">{stats.recentScans}</div>
-            <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• Use dynamic QRs for trackable links</li>
+              <li>• Add logos for brand recognition</li>
+              <li>• Monitor scan analytics regularly</li>
+            </ul>
           </CardContent>
         </Card>
       </div>
@@ -190,62 +254,18 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
       {/* Recent QR Codes */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-foreground">Recent QR Codes</h2>
-          <Button variant="outline" onClick={onAnalyticsClick} className="rounded-xl">
-            <BarChart3 className="w-4 h-4 mr-2" />
-            View Analytics
+          <h2 className="text-2xl font-bold text-foreground">Your QR Codes</h2>
+          <Button 
+            variant="outline" 
+            onClick={onCreateClick}
+            className="rounded-xl"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create New
           </Button>
         </div>
-
-        {qrCodes.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {qrCodes.map((qr) => (
-              <Card key={qr.id} className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base font-semibold truncate">{qr.title}</CardTitle>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge className={`text-xs px-2 py-1 rounded-lg ${getQRTypeColor(qr.qr_type)}`}>
-                          {formatQRType(qr.qr_type)}
-                        </Badge>
-                        <Badge variant={qr.is_active ? "default" : "secondary"} className="text-xs px-2 py-1 rounded-lg">
-                          {qr.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center ml-3">
-                      <QrCode className="w-6 h-6 text-gray-600" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Scans</p>
-                      <p className="text-lg font-bold text-mono">{qr.scan_count || 0}</p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="rounded-xl hover:bg-gray-50">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="rounded-2xl shadow-md">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <QrCode className="w-12 h-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No QR codes yet</h3>
-              <p className="text-gray-500 text-center mb-4">Create your first QR code to get started</p>
-              <Button onClick={onCreateClick} className="bg-primary hover:bg-primary-hover text-white rounded-xl">
-                <Plus className="w-4 h-4 mr-2" />
-                Create QR Code
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        
+        <QRList />
       </div>
     </div>
   );

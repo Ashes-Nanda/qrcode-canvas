@@ -42,6 +42,7 @@ export const Navigation = ({
   const navItems = [
     { id: "dashboard", label: "Dashboard" },
     { id: "create", label: "Create" },
+    { id: "manage", label: "Manage" },
     { id: "analytics", label: "Analytics" },
   ];
 

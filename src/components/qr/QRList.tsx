@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { QRShare } from './QRShare';
+import { QREditModal } from './QREditModal';
 import { format } from 'date-fns';
 
 interface QRCode {
@@ -28,6 +29,8 @@ interface QRCode {
 export const QRList = () => {
   const [qrCodes, setQrCodes] = useState<QRCode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedQR, setSelectedQR] = useState<QRCode | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -106,6 +109,17 @@ export const QRList = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleEdit = (qr: QRCode) => {
+    setSelectedQR(qr);
+    setEditModalOpen(true);
+  };
+
+  const handleEditUpdate = () => {
+    fetchQRCodes(); // Refresh the list
+    setEditModalOpen(false);
+    setSelectedQR(null);
   };
 
   if (loading) {
@@ -198,7 +212,7 @@ export const QRList = () => {
                       <Eye className="mr-2 h-4 w-4" />
                       {qr.is_active ? 'Deactivate' : 'Activate'}
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleEdit(qr)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
@@ -283,6 +297,17 @@ export const QRList = () => {
           </Card>
         ))}
       </div>
+
+      {/* Edit Modal */}
+      <QREditModal
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedQR(null);
+        }}
+        qrCode={selectedQR}
+        onUpdate={handleEditUpdate}
+      />
     </div>
   );
 };

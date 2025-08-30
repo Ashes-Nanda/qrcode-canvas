@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Share2, Copy, Mail, MessageSquare, Link } from 'lucide-react';
+import { Share2, Copy, Mail, MessageSquare } from 'lucide-react';
 
 interface QRShareProps {
   qrId: string;
@@ -72,9 +71,9 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-md rounded-2xl bg-white border-gray-200 shadow-xl">
-        <DialogHeader className="space-y-3 pb-4">
-          <DialogTitle className="text-xl font-bold text-foreground">Share QR Code</DialogTitle>
+      <DialogContent className="sm:max-w-md bg-white border-gray-200 shadow-2xl">
+        <DialogHeader className="space-y-3 pb-4 border-b border-gray-100">
+          <DialogTitle className="text-xl font-bold text-gray-900">Share QR Code</DialogTitle>
           <DialogDescription className="text-gray-600">
             Share your QR code with others using the link below
           </DialogDescription>
@@ -82,18 +81,18 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
         
         <div className="space-y-5">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">QR Code Link</Label>
+            <Label className="text-sm font-medium text-gray-900">QR Code Link</Label>
             <div className="flex gap-2">
               <Input
                 value={shareUrl}
                 readOnly
-                className="font-mono text-sm rounded-xl border-gray-200 h-10 px-3"
+                className="font-mono text-sm rounded-xl border-gray-200 h-10 px-3 bg-gray-50"
               />
               <Button
                 onClick={() => copyToClipboard(shareUrl)}
                 size="sm"
                 variant="outline"
-                className="rounded-xl border-gray-200 h-10 px-3"
+                className="rounded-xl border-gray-200 h-10 px-3 bg-white hover:bg-gray-50"
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -104,7 +103,7 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
             <Button
               onClick={shareViaEmail}
               variant="outline"
-              className="flex items-center gap-2 rounded-xl border-gray-200 h-10"
+              className="flex items-center gap-2 rounded-xl border-gray-200 h-10 bg-white hover:bg-gray-50"
             >
               <Mail className="h-4 w-4" />
               Email
@@ -113,7 +112,7 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
             <Button
               onClick={shareViaSMS}
               variant="outline"
-              className="flex items-center gap-2 rounded-xl border-gray-200 h-10"
+              className="flex items-center gap-2 rounded-xl border-gray-200 h-10 bg-white hover:bg-gray-50"
             >
               <MessageSquare className="h-4 w-4" />
               SMS

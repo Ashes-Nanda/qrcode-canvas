@@ -175,6 +175,7 @@ export const QRGenerator = () => {
 
     setLoading(true);
     try {
+      // Generate QR code with default colors (will be customizable in edit mode)
       const dataUrl = await QRCode.toDataURL(qrUrl, {
         width: 400,
         margin: 2,
