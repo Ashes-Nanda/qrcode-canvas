@@ -55,6 +55,8 @@ export const Dashboard = () => {
         );
       case 'create':
         return <QRGenerator />;
+      case 'manage':
+        return <QRList />;
       case 'analytics':
         return <Analytics />;
       default:

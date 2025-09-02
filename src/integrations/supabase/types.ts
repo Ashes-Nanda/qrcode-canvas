@@ -107,6 +107,7 @@ export type Database = {
           ip_address: unknown | null
           qr_code_id: string
           referrer: string | null
+          scan_latency: number | null
           scanned_at: string
           user_agent: string | null
         }
@@ -118,6 +119,7 @@ export type Database = {
           ip_address?: unknown | null
           qr_code_id: string
           referrer?: string | null
+          scan_latency?: number | null
           scanned_at?: string
           user_agent?: string | null
         }
@@ -129,6 +131,7 @@ export type Database = {
           ip_address?: unknown | null
           qr_code_id?: string
           referrer?: string | null
+          scan_latency?: number | null
           scanned_at?: string
           user_agent?: string | null
         }
