@@ -50,6 +50,7 @@ export type Database = {
           action_type: string | null
           created_at: string
           description: string | null
+          design_options: Json | null
           destination_url: string | null
           geo_data: Json | null
           id: string
@@ -66,6 +67,7 @@ export type Database = {
           action_type?: string | null
           created_at?: string
           description?: string | null
+          design_options?: Json | null
           destination_url?: string | null
           geo_data?: Json | null
           id?: string
@@ -82,6 +84,7 @@ export type Database = {
           action_type?: string | null
           created_at?: string
           description?: string | null
+          design_options?: Json | null
           destination_url?: string | null
           geo_data?: Json | null
           id?: string
