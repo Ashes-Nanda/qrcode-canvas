@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { EnhancedInput } from '@/components/ui/enhanced-input';
+import { ProgressCountdown } from '@/components/ui/progress-countdown';
 import { AuthModal } from '@/components/auth/AuthModal';
+import { EnhancedFooter } from '@/components/layout/EnhancedFooter';
 import { QrCode, BarChart3, Smartphone, Globe, Zap, Shield } from 'lucide-react';
 import QRCode from 'qrcode';
 
@@ -11,20 +13,36 @@ export const LandingPage = () => {
   const [demoQR, setDemoQR] = useState('');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [isFirstGeneration, setIsFirstGeneration] = useState(true);
 
   const generateDemoQR = async () => {
+    if (isGenerating) return;
+    
+    setIsGenerating(true);
+    setShowProgress(true);
+    setDemoQR(''); // Clear previous QR
+  };
+
+  const handleProgressComplete = async () => {
     try {
       const dataUrl = await QRCode.toDataURL(demoUrl, {
         width: 200,
         margin: 2,
         color: {
-          dark: '#3B3B98',
+          dark: '#2e266d', // Using new purple primary
           light: '#FFFFFF'
         }
       });
       setDemoQR(dataUrl);
+      setShowProgress(false);
+      setIsGenerating(false);
+      setIsFirstGeneration(false);
     } catch (error) {
       console.error('Failed to generate demo QR:', error);
+      setShowProgress(false);
+      setIsGenerating(false);
     }
   };
 
@@ -110,7 +128,7 @@ export const LandingPage = () => {
                     setAuthMode('signup');
                     setAuthModalOpen(true);
                   }}
-                  className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8"
+                  className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-lg hover:scale-105 transition-all duration-200"
                 >
                   Start Your Free Trial →
                 </Button>
@@ -146,27 +164,62 @@ export const LandingPage = () => {
             {/* Demo QR Generator */}
             <Card className="rounded-2xl shadow-lg">
               <CardHeader>
-                <CardTitle className="text-xl">Try it now</CardTitle>
-                <CardDescription>Generate a QR code instantly</CardDescription>
+                <CardTitle className="text-xl">
+                  {isFirstGeneration ? "Try it now" : "Your first QR is a free gift from us!"}
+                </CardTitle>
+                <CardDescription>
+                  {isFirstGeneration 
+                    ? "Generate a QR code instantly" 
+                    : "You can track every scan on this QR for richer insights!"
+                  }
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Input
+                <div className="space-y-4">
+                  <EnhancedInput
                     placeholder="Enter any URL"
                     value={demoUrl}
                     onChange={(e) => setDemoUrl(e.target.value)}
-                    className="rounded-xl border-gray-200"
+                    className="text-lg h-14"
                   />
-                  <Button 
-                    onClick={generateDemoQR}
-                    className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl"
-                  >
-                    Generate QR Code
-                  </Button>
+                  
+                  {!isFirstGeneration ? (
+                    <div className="grid grid-cols-1 gap-3">
+                      <Button 
+                        onClick={generateDemoQR}
+                        disabled={isGenerating}
+                        className="w-full bg-secondary hover:bg-secondary-hover text-white rounded-xl h-12 text-lg font-medium"
+                      >
+                        Track scanning data
+                      </Button>
+                      <Button 
+                        onClick={generateDemoQR}
+                        disabled={isGenerating}
+                        variant="outline"
+                        className="w-full rounded-xl h-12"
+                      >
+                        Create a new QR code
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      onClick={generateDemoQR}
+                      disabled={isGenerating}
+                      className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl h-12 text-lg font-medium"
+                    >
+                      Generate QR Code
+                    </Button>
+                  )}
                 </div>
                 
-                {demoQR && (
-                  <div className="flex justify-center p-6 bg-gray-50 rounded-2xl">
+                <ProgressCountdown 
+                  isActive={showProgress}
+                  onComplete={handleProgressComplete}
+                  duration={3000}
+                />
+                
+                {demoQR && !showProgress && (
+                  <div className="flex justify-center p-6 bg-gray-50 rounded-2xl animate-fade-in">
                     <img src={demoQR} alt="Demo QR Code" className="rounded-xl" />
                   </div>
                 )}
@@ -303,27 +356,14 @@ export const LandingPage = () => {
               setAuthMode('signup');
               setAuthModalOpen(true);
             }}
-            className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8"
+            className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-lg hover:scale-105 transition-all duration-200"
           >
             Start Your Free Trial →
           </Button>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-gray-200">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
-              <QrCode className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-foreground">QRCode Canvas Pro</span>
-          </div>
-          <p className="text-gray-500">
-            © 2025 QRCode Canvas Pro. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <EnhancedFooter />
 
       <AuthModal 
         isOpen={authModalOpen}

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { QrCode, BarChart3, Eye, TrendingUp, Plus, ArrowRight } from 'lucide-react';
+import { SearchInput } from '@/components/ui/search-input';
+import { NotificationBell } from '@/components/ui/notification-bell';
 import { QRList } from '@/components/qr/QRList';
+import { QrCode, Plus, BarChart3, Eye, TrendingUp, MapPin, Clock, ArrowRight } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardOverviewProps {
   onCreateClick: () => void;
@@ -16,6 +18,13 @@ interface DashboardStats {
   activeQRs: number;
   totalScans: number;
   recentScans: number;
+  lastScanLocation?: string;
+  lastScanTime?: Date;
+}
+
+interface UserProfile {
+  full_name?: string;
+  email?: string;
 }
 
 export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: DashboardOverviewProps) => {
@@ -26,11 +35,31 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
     recentScans: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchUserProfile();
   }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('user_id', user.id)
+        .single();
+
+      setProfile(data || { email: user.email });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -134,22 +163,54 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-gray-600">
-            Welcome back! Here's an overview of your QR code performance.
-          </p>
+      {/* Enhanced Header with Welcome Message */}
+      <div className="space-y-6">
+        {/* Welcome Section */}
+        <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl p-6 border border-primary/20">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-foreground">
+                Welcome back{profile?.full_name ? `, ${profile.full_name}` : ''}! 👋
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Here's your QR performance overview
+              </p>
+              {stats.lastScanTime && (
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    <span>Last scan: {stats.lastScanLocation}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{stats.lastScanTime.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <NotificationBell />
+              <Button 
+                onClick={onCreateClick}
+                className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create QR Code
+              </Button>
+            </div>
+          </div>
         </div>
-        
-        <Button 
-          onClick={onCreateClick}
-          className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create QR Code
-        </Button>
+
+        {/* Search Bar */}
+        <div className="flex justify-center">
+          <SearchInput
+            placeholder="Search your QR codes by name or ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-md"
+          />
+        </div>
       </div>
 
       {/* Stats Cards */}
