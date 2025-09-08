@@ -18,21 +18,25 @@ All colors MUST be HSL.
     --popover: 255 255 255 1;
     --popover-foreground: 28 28 28 1;
 
-    /* Deep indigo primary */
-    --primary: 240 45% 41%; /* Deep indigo #3B3B98 */
+    /* Purple primary palette: #2e266d, #6257e3, #f4f6fc */
+    --primary: 245 43% 32%; /* Deep purple #2e266d */
     --primary-foreground: 255 255 255 1;
-    --primary-hover: 240 45% 46%;
-    --primary-light: 240 45% 85%;
+    --primary-hover: 245 76% 64%; /* Medium purple #6257e3 */
+    --primary-light: 245 67% 97%; /* Light purple #f4f6fc */
 
-    /* Bright teal accent */
-    --secondary: 174 100% 36%; /* Bright teal #00B8A9 */
+    /* Green secondary palette: #eef8eb, #81b673, #2c4f40 */
+    --secondary: 105 29% 57%; /* Medium green #81b673 */
     --secondary-foreground: 255 255 255 1;
-    --secondary-hover: 174 100% 41%;
+    --secondary-hover: 105 29% 62%;
 
-    /* Coral accent */
-    --accent: 0 79% 70%; /* Coral #FF6B6B */
+    /* Green accent variations */
+    --accent: 151 26% 25%; /* Dark green #2c4f40 */
     --accent-foreground: 255 255 255 1;
-    --accent-hover: 0 79% 75%;
+    --accent-hover: 151 26% 30%;
+    
+    /* Success/highlight green */
+    --success: 105 55% 93%; /* Light green #eef8eb */
+    --success-foreground: 151 26% 25%;
 
     --muted: 241 245 249 1; /* Gray-100 */
     --muted-foreground: 100 116 139 1; /* Gray-500 */
@@ -42,7 +46,7 @@ All colors MUST be HSL.
 
     --border: 226 232 240 1; /* Gray-200 */
     --input: 241 245 249 1; /* Gray-100 */
-    --ring: 211 86% 45%; /* Primary for focus rings */
+    --ring: 245 76% 64%; /* Primary purple for focus rings */
 
     --radius: 0.75rem; /* Material Design rounded corners */
 
@@ -84,18 +88,25 @@ All colors MUST be HSL.
     --popover: 30 41 59 1;
     --popover-foreground: 248 250 252 1;
 
-    --primary: 211 86% 65%; /* Lighter Material Blue for dark mode */
+    /* Purple primary palette for dark mode */
+    --primary: 245 76% 70%; /* Lighter purple for dark mode */
     --primary-foreground: 15 23 42 1;
-    --primary-hover: 211 86% 70%;
-    --primary-light: 211 86% 25%;
+    --primary-hover: 245 76% 75%;
+    --primary-light: 245 43% 20%;
 
-    --secondary: 142 69% 65%; /* Lighter Material Green for dark mode */
+    /* Green secondary palette for dark mode */
+    --secondary: 105 29% 62%; /* Medium green for dark mode */
     --secondary-foreground: 15 23 42 1;
-    --secondary-hover: 142 69% 70%;
+    --secondary-hover: 105 29% 67%;
 
-    --accent: 36 100% 65%; /* Lighter Material Orange for dark mode */
-    --accent-foreground: 15 23 42 1;
-    --accent-hover: 36 100% 70%;
+    /* Green accent for dark mode */
+    --accent: 151 26% 35%; /* Dark green for dark mode */
+    --accent-foreground: 248 250 252 1;
+    --accent-hover: 151 26% 40%;
+    
+    /* Success/highlight green for dark mode */
+    --success: 105 29% 20%; /* Dark green background */
+    --success-foreground: 105 55% 85%;
 
     --muted: 51 65 85 1; /* Slate-600 */
     --muted-foreground: 148 163 184 1; /* Slate-400 */
@@ -105,7 +116,7 @@ All colors MUST be HSL.
 
     --border: 51 65 85 1; /* Slate-600 */
     --input: 51 65 85 1;
-    --ring: 211 86% 65%;
+    --ring: 245 76% 70%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
