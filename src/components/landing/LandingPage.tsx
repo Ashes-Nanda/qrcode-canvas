@@ -9,7 +9,7 @@ import { QrCode, BarChart3, Smartphone, Globe, Zap, Shield } from 'lucide-react'
 import QRCode from 'qrcode';
 
 export const LandingPage = () => {
-  const [demoUrl, setDemoUrl] = useState('https://example.com');
+  const [demoUrl, setDemoUrl] = useState();
   const [demoQR, setDemoQR] = useState('');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
@@ -128,7 +128,7 @@ export const LandingPage = () => {
                     setAuthMode('signup');
                     setAuthModalOpen(true);
                   }}
-                  className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-lg hover:scale-105 transition-all duration-200"
+                  className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-xl hover:scale-110 transition-all duration-200 focus-visible:shadow-xl"
                 >
                   Start Your Free Trial →
                 </Button>
@@ -179,7 +179,7 @@ export const LandingPage = () => {
                   <EnhancedInput
                     placeholder="Enter any URL"
                     value={demoUrl}
-                    onChange={(e) => setDemoUrl(e.target.value)}
+                    
                     className="text-lg h-14"
                   />
                   

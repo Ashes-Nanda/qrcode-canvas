@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin } from 'lucide-react';
+import { ProgressCountdown } from '@/components/ui/progress-countdown';
+import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin, UploadCloud, Palette, FileDown } from 'lucide-react';
 
 interface MultiUrl {
   url: string;
@@ -67,6 +68,12 @@ export const QRGenerator = () => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [hasGeneratedOnce, setHasGeneratedOnce] = useState(false);
+  const [darkColor, setDarkColor] = useState<string>('#2e266d');
+  const [lightColor, setLightColor] = useState<string>('#FFFFFF');
+  const [palette, setPalette] = useState<string[]>([]);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
@@ -195,25 +202,142 @@ export const QRGenerator = () => {
     }
 
     setLoading(true);
-    try {
-      // Generate QR code with default colors (will be customizable in edit mode)
-      const dataUrl = await QRCode.toDataURL(qrUrl, {
-        width: 400,
-        margin: 2,
-        color: {
-          dark: '#1976D2',
-          light: '#FFFFFF'
+    setShowProgress(true);
+    setQrCodeDataUrl('');
+
+    // Defer actual QR rendering until progress completes
+    const performGeneration = async () => {
+      try {
+        const dataUrl = await QRCode.toDataURL(qrUrl, {
+          width: 400,
+          margin: 2,
+          color: {
+            dark: darkColor,
+            light: lightColor
+          }
+        });
+        setQrCodeDataUrl(dataUrl);
+        if (!hasGeneratedOnce) {
+          toast({
+            title: 'Success',
+            description: 'Your custom, forever-QR Code is ready! 🎉',
+          });
+          setHasGeneratedOnce(true);
+        } else {
+          toast({
+            title: 'Updated',
+            description: 'QR code generated successfully.',
+          });
         }
-      });
-      setQrCodeDataUrl(dataUrl);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to generate QR code",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to generate QR code',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+        setShowProgress(false);
+      }
+    };
+
+    // Store function for use after countdown completes
+    pendingGenerationRef.current = performGeneration;
+  };
+
+  // Holds the pending generation callback until progress completes
+  const pendingGenerationRef = useRef<null | (() => Promise<void>)>(null);
+
+  // Image upload & palette extraction
+  const handleImageUpload = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const maxSide = 200;
+        const ratio = Math.max(img.width, img.height) / maxSide;
+        canvas.width = Math.max(1, Math.floor(img.width / ratio));
+        canvas.height = Math.max(1, Math.floor(img.height / ratio));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const buckets: Record<string, { r: number; g: number; b: number; count: number }> = {};
+        for (let i = 0; i < data.length; i += 4 * 10) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const key = `${r >> 4}-${g >> 4}-${b >> 4}`;
+          if (!buckets[key]) buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
+          buckets[key].r += r; buckets[key].g += g; buckets[key].b += b; buckets[key].count += 1;
+        }
+        const colors = Object.values(buckets)
+          .filter(b => b.count > 0)
+          .map(b => {
+            const r = Math.round(b.r / b.count);
+            const g = Math.round(b.g / b.count);
+            const b2 = Math.round(b.b / b.count);
+            return `#${[r, g, b2].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+          });
+        colors.sort((a, b) => luminance(a) - luminance(b));
+        setPalette(colors.slice(0, 8));
+        if (colors.length) {
+          setDarkColor(colors[0]);
+          const lightCandidate = colors[colors.length - 1];
+          setLightColor(luminance(lightCandidate) > 0.9 ? '#FFFFFF' : lightCandidate);
+        }
+      } catch {}
+    };
+    img.src = url;
+  };
+
+  const luminance = (hex: string): number => {
+    const m = hex.replace('#', '');
+    const r = parseInt(m.substring(0, 2), 16) / 255;
+    const g = parseInt(m.substring(2, 4), 16) / 255;
+    const b = parseInt(m.substring(4, 6), 16) / 255;
+    const a = [r, g, b].map(v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+    return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+  };
+
+  const downloadSVG = async () => {
+    if (!qrCodeDataUrl) return;
+    try {
+      let qrContent = '';
+      switch (qrType) {
+        case 'static':
+        case 'dynamic':
+          qrContent = qrType === 'dynamic' ? `${window.location.origin}/qr/PLACEHOLDER` : destinationUrl;
+          break;
+        case 'multi-url':
+        case 'action':
+        case 'geo':
+          qrContent = `${window.location.origin}/qr/PLACEHOLDER`;
+          break;
+        case 'vcard':
+          qrContent = generateVCardString(vCardData);
+          break;
+        case 'text':
+          qrContent = textContent;
+          break;
+        case 'event':
+          qrContent = generateEventString(eventData);
+          break;
+      }
+      const svgString = await QRCode.toString(qrContent || ' ', { type: 'svg', margin: 2, color: { dark: darkColor, light: lightColor } });
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (title ? `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}` : 'qr_code') + '.svg';
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Downloaded', description: 'SVG downloaded successfully.' });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create SVG', variant: 'destructive' });
     }
   };
 
@@ -303,8 +427,8 @@ export const QRGenerator = () => {
           width: 400,
           margin: 2,
           color: {
-            dark: '#1976D2',
-            light: '#FFFFFF'
+            dark: darkColor,
+            light: lightColor
           }
         });
         setQrCodeDataUrl(updatedDataUrl);
@@ -495,17 +619,52 @@ export const QRGenerator = () => {
             </Select>
           </div>
 
-          {/* Static/Dynamic URL Input */}
+          {/* Style & Branding */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium flex items-center gap-2"><Palette className="h-4 w-4" /> Style & Branding</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer hover:bg-accent/10">
+                <UploadCloud className="h-4 w-4" />
+                <span className="text-sm">Upload image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleImageUpload(f);
+                  }}
+                />
+              </label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={darkColor} onChange={(e) => setDarkColor(e.target.value)} aria-label="QR dark color" className="h-9 w-9 rounded-md border p-0" />
+                <span className="text-xs">Dark</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="color" value={lightColor} onChange={(e) => setLightColor(e.target.value)} aria-label="QR light color" className="h-9 w-9 rounded-md border p-0" />
+                <span className="text-xs">Light</span>
+              </div>
+            </div>
+            {palette.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {palette.map((c, i) => (
+                  <button key={i} type="button" aria-label={`Pick color ${c}`} className="h-7 w-7 rounded-md border" style={{ backgroundColor: c }} onClick={() => setDarkColor(c)} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Static/Dynamic URL Input as larger textarea */}
           {(qrType === 'static' || qrType === 'dynamic') && (
             <div className="space-y-2">
               <Label htmlFor="url">Destination URL</Label>
-              <Input
+              <Textarea
                 id="url"
-                type="url"
                 placeholder="https://example.com"
                 value={destinationUrl}
                 onChange={(e) => setDestinationUrl(e.target.value)}
-                className="smooth-transition"
+                rows={4}
+                className="smooth-transition text-base rounded-xl"
               />
             </div>
           )}
@@ -840,6 +999,17 @@ export const QRGenerator = () => {
               'Generate QR Code'
             )}
           </Button>
+
+          <ProgressCountdown
+            isActive={showProgress}
+            onComplete={async () => {
+              if (pendingGenerationRef.current) {
+                await pendingGenerationRef.current();
+                pendingGenerationRef.current = null;
+              }
+            }}
+            duration={3000}
+          />
         </CardContent>
       </Card>
 
@@ -872,6 +1042,15 @@ export const QRGenerator = () => {
                 </Button>
                 
                 <Button 
+                  onClick={downloadSVG}
+                  variant="outline"
+                  className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Download SVG
+                </Button>
+
+                <Button 
                   onClick={saveQR} 
                   disabled={saving}
                   className="flex-1 bg-secondary hover:bg-secondary-hover text-white rounded-xl shadow-md"
@@ -887,6 +1066,27 @@ export const QRGenerator = () => {
                       Save
                     </>
                   )}
+                </Button>
+              </div>
+
+              {/* Post-generation action buttons */}
+              <div className="grid grid-cols-1 gap-3">
+                <Button 
+                  onClick={() => {
+                    resetForm();
+                  }}
+                  variant="outline"
+                  className="w-full rounded-xl h-12"
+                >
+                  Create a new QR code
+                </Button>
+                <Button 
+                  onClick={() => {
+                    window.location.hash = '#/dashboard/analytics';
+                  }}
+                  className="w-full bg-secondary hover:bg-secondary-hover text-white rounded-xl h-12 text-base font-medium"
+                >
+                  Track scanning data
                 </Button>
               </div>
             </div>

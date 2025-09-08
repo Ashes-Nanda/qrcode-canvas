@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode, Copy, Grid2X2, Rows, Search, EyeIcon } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { QRShare } from './QRShare';
 import { QREditModal } from './QREditModal';
 import { format } from 'date-fns';
+import QRCode from 'qrcode';
 
 interface QRCode {
   id: string;
@@ -31,6 +32,10 @@ export const QRList = () => {
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedQR, setSelectedQR] = useState<QRCode | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'scans_desc' | 'scans_asc'>('date_desc');
+  const [search, setSearch] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -122,6 +127,41 @@ export const QRList = () => {
     setSelectedQR(null);
   };
 
+  const filtered = qrCodes
+    .filter((qr) => typeFilter === 'all' ? true : qr.qr_type === typeFilter)
+    .filter((qr) =>
+      search.trim() ?
+        (qr.title?.toLowerCase().includes(search.toLowerCase()) || qr.id.includes(search)) : true
+    )
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'date_asc':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'scans_desc':
+          return (b.scan_count || 0) - (a.scan_count || 0);
+        case 'scans_asc':
+          return (a.scan_count || 0) - (b.scan_count || 0);
+        case 'date_desc':
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+
+  const copyShareLink = async (id: string) => {
+    const link = `${window.location.origin}/qr/${id}`;
+    await navigator.clipboard.writeText(link);
+    toast({ title: 'Copied', description: 'Share link copied to clipboard.' });
+  };
+
+  const previewDataUrl = async (id: string) => {
+    const url = `${window.location.origin}/qr/${id}`;
+    return await QRCode.toDataURL(url, {
+      width: 200,
+      margin: 2,
+      color: { dark: '#2e266d', light: '#FFFFFF' },
+    });
+  };
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -155,8 +195,8 @@ export const QRList = () => {
           <CardContent className="p-12 text-center">
           <div className="text-muted-foreground">
             <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">No QR codes yet</h3>
-            <p>Create your first QR code to get started!</p>
+            <h3 className="text-lg font-medium mb-2">0 Total Scans</h3>
+            <p>Create your first QR to tell people about your business!</p>
           </div>
         </CardContent>
       </Card>
@@ -171,13 +211,60 @@ export const QRList = () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">Manage QR Codes</h1>
           <p className="text-gray-600">View and manage all your QR codes</p>
         </div>
-        <Badge variant="secondary" className="text-sm px-3 py-1 rounded-xl">
-          {qrCodes.length} total
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-sm px-3 py-1 rounded-xl">
+            {filtered.length} shown
+          </Badge>
+          <Button variant={viewMode === 'grid' ? 'secondary' : 'outline'} size="sm" className="rounded-xl" onClick={() => setViewMode('grid')}>
+            <Grid2X2 className="h-4 w-4 mr-1" /> Grid
+          </Button>
+          <Button variant={viewMode === 'table' ? 'secondary' : 'outline'} size="sm" className="rounded-xl" onClick={() => setViewMode('table')}>
+            <Rows className="h-4 w-4 mr-1" /> Table
+          </Button>
+        </div>
       </div>
 
+      {/* Controls */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            className="pl-9 pr-3 py-2 text-sm rounded-xl border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder="Search by name or ID"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="px-3 py-2 text-sm rounded-xl border border-input bg-background"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          <option value="all">All types</option>
+          <option value="static">Static</option>
+          <option value="dynamic">Dynamic</option>
+          <option value="multi-url">Multi-URL</option>
+          <option value="action">Action</option>
+          <option value="geo">Geo</option>
+          <option value="vcard">vCard</option>
+          <option value="text">Text</option>
+          <option value="event">Event</option>
+        </select>
+        <select
+          className="px-3 py-2 text-sm rounded-xl border border-input bg-background"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as any)}
+        >
+          <option value="date_desc">Newest</option>
+          <option value="date_asc">Oldest</option>
+          <option value="scans_desc">Most scans</option>
+          <option value="scans_asc">Least scans</option>
+        </select>
+      </div>
+
+      {viewMode === 'grid' ? (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {qrCodes.map((qr) => (
+        {filtered.map((qr) => (
           <Card key={qr.id} className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -206,6 +293,10 @@ export const QRList = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => copyShareLink(qr.id)}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy share link
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => toggleActive(qr.id, qr.is_active)}
                     >
@@ -230,6 +321,28 @@ export const QRList = () => {
             
             <CardContent>
               <div className="space-y-3">
+                {/* Hover quick preview */}
+                <div className="group relative">
+                  <div className="absolute right-2 -top-10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={async () => {
+                        const dataUrl = await previewDataUrl(qr.id);
+                        const w = window.open('about:blank', '_blank');
+                        if (w) {
+                          w.document.write(`<img src="${dataUrl}" alt="QR Preview"/>`);
+                        }
+                      }}
+                    >
+                      <EyeIcon className="h-4 w-4 mr-1" /> Preview
+                    </Button>
+                    <Button variant="outline" size="sm" className="rounded-xl" onClick={() => copyShareLink(qr.id)}>
+                      <Copy className="h-4 w-4 mr-1" /> Copy
+                    </Button>
+                  </div>
+                </div>
                 {/* Show different content based on QR type */}
                 {qr.qr_type === 'static' || qr.qr_type === 'dynamic' ? (
                   qr.destination_url && (
@@ -297,6 +410,42 @@ export const QRList = () => {
           </Card>
         ))}
       </div>
+      ) : (
+        <div className="overflow-x-auto border rounded-2xl">
+          <table className="w-full text-sm">
+            <thead className="bg-primary/5 text-foreground">
+              <tr>
+                <th className="text-left p-3">QR Name</th>
+                <th className="text-left p-3">Type</th>
+                <th className="text-left p-3">Created</th>
+                <th className="text-left p-3">Last Scan</th>
+                <th className="text-left p-3">Active</th>
+                <th className="text-left p-3">Scans</th>
+                <th className="text-left p-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((qr) => (
+                <tr key={qr.id} className="border-t">
+                  <td className="p-3 font-medium">{qr.title}</td>
+                  <td className="p-3 capitalize">{qr.qr_type.replace('-', ' ')}</td>
+                  <td className="p-3">{format(new Date(qr.created_at), 'MMM d, yyyy')}</td>
+                  <td className="p-3">—</td>
+                  <td className="p-3">{qr.is_active ? 'Active' : 'Inactive'}</td>
+                  <td className="p-3">{qr.scan_count}</td>
+                  <td className="p-3">
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="rounded-xl" onClick={() => handleEdit(qr)}>Edit</Button>
+                      <Button size="sm" variant="outline" className="rounded-xl" onClick={() => copyShareLink(qr.id)}>Copy</Button>
+                      <Button size="sm" className="rounded-xl" onClick={() => toggleActive(qr.id, qr.is_active)}>{qr.is_active ? 'Deactivate' : 'Activate'}</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Edit Modal */}
       <QREditModal

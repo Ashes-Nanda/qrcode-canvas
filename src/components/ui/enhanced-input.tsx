@@ -10,7 +10,15 @@ export interface EnhancedInputProps
 const EnhancedInput = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
   ({ className, type, placeholder, onFocus, onBlur, ...props }, ref) => {
     const [isFocused, setIsFocused] = React.useState(false);
-    const [hasValue, setHasValue] = React.useState(false);
+    const [hasValue, setHasValue] = React.useState<boolean>(
+      typeof props.value === 'string' ? props.value.length > 0 : false
+    );
+
+    React.useEffect(() => {
+      if (typeof props.value === 'string') {
+        setHasValue(props.value.length > 0);
+      }
+    }, [props.value]);
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setIsFocused(true);
@@ -48,7 +56,7 @@ const EnhancedInput = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
           <label className={cn(
             "absolute left-4 transition-all duration-200 pointer-events-none text-muted-foreground",
             (isFocused || hasValue) 
-              ? "-top-2 left-3 text-xs bg-background px-1 text-primary font-medium" 
+              ? "-top-4 left-3 text-xs bg-background px-1 text-primary font-medium" 
               : "top-3.5 text-base"
           )}>
             {placeholder}

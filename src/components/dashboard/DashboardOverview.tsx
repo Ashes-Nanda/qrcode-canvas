@@ -85,6 +85,9 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
       const qrIds = qrData?.map(qr => qr.id) || [];
       let recentScans = 0;
 
+      let lastScanLocation: string | undefined = undefined;
+      let lastScanTime: Date | undefined = undefined;
+
       if (qrIds.length > 0) {
         const { data: scanData, error: scanError } = await supabase
           .from('qr_scan_logs')
@@ -94,6 +97,21 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
 
         if (scanError) throw scanError;
         recentScans = scanData?.length || 0;
+
+        // Fetch the most recent scan for location/time detail
+        const { data: latestScan, error: latestError } = await supabase
+          .from('qr_scan_logs')
+          .select('city, scanned_at')
+          .in('qr_code_id', qrIds)
+          .order('scanned_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestError && latestError.code !== 'PGRST116') throw latestError;
+        if (latestScan?.scanned_at) {
+          lastScanTime = new Date(latestScan.scanned_at as any);
+          lastScanLocation = latestScan.city || 'Unknown city';
+        }
       }
 
       setStats({
@@ -101,6 +119,8 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
         activeQRs,
         totalScans,
         recentScans,
+        lastScanLocation,
+        lastScanTime,
       });
     } catch (error: any) {
       toast({
@@ -172,20 +192,11 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
               <h1 className="text-3xl font-bold text-foreground">
                 Welcome back{profile?.full_name ? `, ${profile.full_name}` : ''}! 👋
               </h1>
-              <p className="text-lg text-muted-foreground">
-                Here's your QR performance overview
-              </p>
+              <p className="text-lg text-muted-foreground">Here's your QR performance overview.</p>
               {stats.lastScanTime && (
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>Last scan: {stats.lastScanLocation}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{stats.lastScanTime.toLocaleString()}</span>
-                  </div>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Your last scan was in {stats.lastScanLocation} at {stats.lastScanTime.toLocaleString()}.
+                </p>
               )}
             </div>
             

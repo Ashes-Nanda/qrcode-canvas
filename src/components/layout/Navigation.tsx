@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { QrCode, LogOut, Settings, User } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavigationProps {
   activeTab: string;
@@ -22,6 +23,18 @@ export const Navigation = ({
   profile,
 }: NavigationProps) => {
   const { toast } = useToast();
+
+  const handleToggleDarkMode = () => {
+    const root = document.documentElement;
+    const isDark = root.classList.contains('dark');
+    if (isDark) {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -61,21 +74,33 @@ export const Navigation = ({
           </div>
 
           {/* Main Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                className={`px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
-                  activeTab === item.id
-                    ? "bg-primary text-white shadow-md"
-                    : "text-gray-600 hover:text-primary hover:bg-gray-50"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          <TooltipProvider delayDuration={200}>
+            <div className="hidden md:flex items-center gap-8">
+              {navItems.map((item) => (
+                <Tooltip key={item.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => onTabChange(item.id)}
+                      className={`px-4 py-2 text-sm font-medium rounded-xl transition-all duration-200 ${
+                        activeTab === item.id
+                          ? "bg-primary text-white shadow-md"
+                          : "text-gray-600 hover:text-primary hover:bg-gray-50"
+                      }`}
+                      aria-label={`Go to ${item.label}`}
+                    >
+                      {item.label}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-sm">
+                    {item.id === 'dashboard' && 'Overview of your QR performance'}
+                    {item.id === 'create' && 'Create a new QR code'}
+                    {item.id === 'manage' && 'Manage and edit your QR codes'}
+                    {item.id === 'analytics' && 'Explore scan analytics'}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
 
           {/* User Menu */}
           <DropdownMenu>
@@ -106,15 +131,19 @@ export const Navigation = ({
               </div>
               <DropdownMenuItem>
                 <User className="mr-2 h-4 w-4" />
-                Profile
+                Account Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast({ title: 'Upgrade', description: 'Upgrade to Pro coming soon.' })}>
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                Upgrade Tier
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleToggleDarkMode}>
+                <Settings className="mr-2 h-4 w-4" />
+                Toggle Dark Mode
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
-                Sign out
+                Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

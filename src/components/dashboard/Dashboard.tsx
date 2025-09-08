@@ -6,6 +6,7 @@ import { QRGenerator } from '@/components/qr/QRGenerator';
 import { QRList } from '@/components/qr/QRList';
 import { Analytics } from '@/components/analytics/Analytics';
 import { useToast } from '@/hooks/use-toast';
+import { EnhancedFooter } from '@/components/layout/EnhancedFooter';
 
 export const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
@@ -85,6 +86,8 @@ export const Dashboard = () => {
           {renderContent()}
         </div>
       </main>
+
+      <EnhancedFooter />
     </div>
   );
 };
