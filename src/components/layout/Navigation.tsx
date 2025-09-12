@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { QrCode, LogOut, Settings, User } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 interface NavigationProps {
   activeTab: string;
@@ -102,8 +103,12 @@ export const Navigation = ({
             </div>
           </TooltipProvider>
 
-          {/* User Menu */}
-          <DropdownMenu>
+          {/* Right Section */}
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            
+            {/* User Menu */}
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -147,6 +152,7 @@ export const Navigation = ({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
 

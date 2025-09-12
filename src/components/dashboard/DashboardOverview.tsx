@@ -305,7 +305,6 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
             </div>
             
             <div className="flex items-center gap-3">
-              <NotificationBell />
               <Button 
                 onClick={onCreateClick}
                 className="bg-primary hover:bg-primary-hover text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.05] hover:-translate-y-0.5 font-medium"
@@ -313,7 +312,6 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
                 <Plus className="h-4 w-4 mr-2" />
                 Create QR Code
               </Button>
-              <ProfileDropdown profile={profile} />
             </div>
           </div>
         </div>
@@ -369,31 +367,31 @@ export const DashboardOverview = ({ onCreateClick, onAnalyticsClick }: Dashboard
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card 
-          className="rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:-translate-y-1 bg-gradient-to-br from-secondary/5 to-secondary/10 border-secondary/20"
+          className="rounded-xl shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer hover:scale-[1.01] bg-gradient-to-br from-secondary/5 to-secondary/10 border-secondary/20"
           onClick={onAnalyticsClick}
         >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-2 bg-secondary/10 rounded-xl">
-                <BarChart3 className="h-5 w-5 text-secondary" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <div className="p-1.5 bg-secondary/10 rounded-lg">
+                <BarChart3 className="h-4 w-4 text-secondary" />
               </div>
-              View Analytics Dashboard
+              Analytics Dashboard
             </CardTitle>
-            <CardDescription>
-              Track performance, engagement metrics, and detailed scan analytics
+            <CardDescription className="text-sm">
+              Track performance and scan metrics
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm text-gray-600">
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-gray-600">
                 <span>Real-time tracking</span>
                 <span className="text-secondary font-medium">✓ Active</span>
               </div>
-              <Button variant="ghost" className="w-full justify-between rounded-xl hover:bg-secondary/10 transition-all duration-200">
-                View Detailed Reports
-                <ArrowRight className="h-4 w-4 text-secondary" />
+              <Button variant="ghost" className="w-full justify-between rounded-lg hover:bg-secondary/10 transition-all duration-200 text-sm h-8">
+                View Reports
+                <ArrowRight className="h-3 w-3 text-secondary" />
               </Button>
             </div>
           </CardContent>
