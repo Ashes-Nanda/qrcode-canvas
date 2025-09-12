@@ -88,7 +88,7 @@ export const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-50 bg-card border-b border-border elevation-1">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -102,7 +102,7 @@ export const LandingPage = () => {
                 setAuthMode('signup');
                 setAuthModalOpen(true);
               }}
-              className="bg-primary hover:bg-primary-hover text-white rounded-xl"
+              className="bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl"
             >
               Get Started
             </Button>
@@ -134,7 +134,7 @@ export const LandingPage = () => {
                     setAuthMode('signup');
                     setAuthModalOpen(true);
                   }}
-                  className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-xl hover:scale-110 transition-all duration-200 focus-visible:shadow-xl hover:shadow-primary/30"
+                  className="group bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl elevation-2 px-8 hover:elevation-4 hover:scale-110 smooth-transition focus-visible:elevation-4 hover:shadow-primary/30"
                 >
                   Start Your Free Trial →
                 </Button>
@@ -196,7 +196,7 @@ export const LandingPage = () => {
                           setAuthMode('signup');
                           setAuthModalOpen(true);
                         }}
-                        className="w-full bg-secondary hover:bg-secondary-hover text-white rounded-xl h-12 text-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
+                        className="w-full bg-secondary hover:bg-secondary-hover text-secondary-foreground rounded-xl h-12 text-lg font-medium elevation-2 hover:elevation-3 smooth-transition hover:scale-[1.02]"
                       >
                         Track scanning data
                       </Button>
@@ -216,7 +216,7 @@ export const LandingPage = () => {
                     <Button 
                       onClick={generateDemoQR}
                       disabled={isGenerating || !demoUrl.trim()}
-                      className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl h-12 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl h-12 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isGenerating ? 'Generating...' : 'Generate QR Code'}
                     </Button>

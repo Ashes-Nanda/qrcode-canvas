@@ -38,19 +38,19 @@ const EnhancedToast: React.FC<EnhancedToastProps> = ({
   }, [duration, onClose])
 
   const variantStyles = {
-    default: "border-gray-200 bg-white text-gray-900",
-    success: "border-green-200 bg-green-50 text-green-900",
-    warning: "border-yellow-200 bg-yellow-50 text-yellow-900", 
-    error: "border-red-200 bg-red-50 text-red-900",
-    info: "border-blue-200 bg-blue-50 text-blue-900"
+    default: "border-border bg-card text-card-foreground",
+    success: "border-secondary bg-success text-success-foreground",
+    warning: "border-yellow-300 bg-yellow-100 text-yellow-900", 
+    error: "border-red-300 bg-red-100 text-red-900",
+    info: "border-primary bg-primary-light text-primary"
   }
 
   const iconStyles = {
-    default: "text-gray-400",
-    success: "text-green-500",
-    warning: "text-yellow-500",
-    error: "text-red-500", 
-    info: "text-blue-500"
+    default: "text-muted-foreground",
+    success: "text-secondary",
+    warning: "text-yellow-600",
+    error: "text-red-600", 
+    info: "text-primary"
   }
 
   const getIcon = () => {
@@ -71,7 +71,7 @@ const EnhancedToast: React.FC<EnhancedToastProps> = ({
   return (
     <div
       className={cn(
-        "pointer-events-auto relative flex w-full max-w-sm items-start space-x-3 rounded-xl border p-4 shadow-lg backdrop-blur-sm animate-in slide-in-from-top-5 fade-in-0 duration-300",
+        "pointer-events-auto relative flex w-full max-w-sm items-start space-x-3 rounded-xl border p-4 elevation-3 animate-in slide-in-from-top-5 fade-in-0 duration-300",
         variantStyles[variant],
         className
       )}
@@ -87,7 +87,7 @@ const EnhancedToast: React.FC<EnhancedToastProps> = ({
           <h4 className="text-sm font-semibold leading-none">{title}</h4>
         )}
         {description && (
-          <p className="text-sm opacity-90 leading-relaxed">{description}</p>
+          <p className="text-sm opacity-95 leading-relaxed">{description}</p>
         )}
         {action && (
           <div className="pt-2">
@@ -108,14 +108,14 @@ const EnhancedToast: React.FC<EnhancedToastProps> = ({
         <button
           onClick={onClose}
           className={cn(
-            "flex-shrink-0 rounded-md p-1 transition-colors hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2",
-            variant === "success" && "hover:bg-green-600/10 focus:ring-green-500",
-            variant === "warning" && "hover:bg-yellow-600/10 focus:ring-yellow-500",
-            variant === "error" && "hover:bg-red-600/10 focus:ring-red-500",
-            variant === "info" && "hover:bg-blue-600/10 focus:ring-blue-500"
+            "flex-shrink-0 rounded-md p-1 smooth-transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            variant === "success" && "hover:bg-secondary/20 focus:ring-secondary",
+            variant === "warning" && "hover:bg-yellow-200 focus:ring-yellow-500",
+            variant === "error" && "hover:bg-red-200 focus:ring-red-500",
+            variant === "info" && "hover:bg-primary/20 focus:ring-primary"
           )}
         >
-          <X className="h-4 w-4 opacity-60" />
+          <X className="h-4 w-4 opacity-70" />
         </button>
       )}
 
@@ -125,11 +125,11 @@ const EnhancedToast: React.FC<EnhancedToastProps> = ({
           <div
             className={cn(
               "h-full animate-shrink-width origin-left",
-              variant === "success" && "bg-green-500",
+              variant === "success" && "bg-secondary",
               variant === "warning" && "bg-yellow-500",
               variant === "error" && "bg-red-500",
-              variant === "info" && "bg-blue-500",
-              variant === "default" && "bg-gray-400"
+              variant === "info" && "bg-primary",
+              variant === "default" && "bg-muted-foreground"
             )}
             style={{
               animationDuration: `${duration}ms`,
