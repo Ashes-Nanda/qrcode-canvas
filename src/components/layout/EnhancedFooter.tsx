@@ -94,13 +94,11 @@ export const EnhancedFooter = () => {
           <div>
             <div className="font-semibold mb-4 text-gray-900">Supported by</div>
             <div className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-3 hover:shadow-sm transition-all duration-200">
-                <img 
-                  src="/assets/C4E LOGO.png" 
-                  alt="C4E Logo" 
-                  className="h-8 w-auto object-contain"
-                />
-              </div>
+              <img 
+                src="/assets/C4E LOGO.png" 
+                alt="C4E Logo" 
+                className="h-8 w-auto object-contain"
+              />
               <p className="text-xs text-gray-500">
                 Powered by innovation and expertise
               </p>

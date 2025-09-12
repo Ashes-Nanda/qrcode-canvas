@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import QRCode from 'qrcode';
 import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { ProgressCountdown } from '@/components/ui/progress-countdown';
-import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin, UploadCloud, Palette, FileDown, Upload } from 'lucide-react';
+import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin, UploadCloud, Palette, FileDown, Upload, FileText } from 'lucide-react';
 
 interface MultiUrl {
   url: string;
@@ -82,6 +83,36 @@ export const QRGenerator = () => {
   const { toast } = useToast();
 
   const generateQR = async () => {
+    // Validate title first
+    if (!title.trim()) {
+      toast({
+        title: "⚠️ Title Required",
+        description: "Please enter a title for your QR code before generating.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check title length
+    if (title.length > 100) {
+      toast({
+        title: "⚠️ Title Too Long",
+        description: "Title must be 100 characters or less. Current length: " + title.length,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check description length
+    if (description && description.length > 500) {
+      toast({
+        title: "⚠️ Description Too Long",
+        description: "Description must be 500 characters or less. Current length: " + description.length,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Validate based on QR type
     let qrUrl = '';
     
@@ -90,78 +121,193 @@ export const QRGenerator = () => {
       case 'dynamic':
         if (!destinationUrl.trim()) {
           toast({
-            title: "Error",
-            description: "Please enter a destination URL",
+            title: "⚠️ URL Required",
+            description: "Please enter a destination URL for your QR code.",
             variant: "destructive",
           });
           return;
         }
         
-        // Validate URL format and protocol
+        // Check URL length
+        if (destinationUrl.length > 2000) {
+          toast({
+            title: "⚠️ URL Too Long",
+            description: `URL must be 2000 characters or less. Current length: ${destinationUrl.length}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Enhanced URL validation
+        let validUrl;
         try {
-          const url = new URL(destinationUrl.startsWith('http') ? destinationUrl : `https://${destinationUrl}`);
-          if (!['http:', 'https:'].includes(url.protocol)) {
+          // Try to parse as-is first
+          validUrl = new URL(destinationUrl);
+        } catch {
+          try {
+            // Try with https:// prefix
+            validUrl = new URL('https://' + destinationUrl);
+          } catch {
             toast({
-              title: "Error",
-              description: "Only HTTP and HTTPS URLs are allowed",
+              title: "⚠️ Invalid URL Format",
+              description: "Please enter a valid URL. Examples: https://example.com, www.example.com, or example.com",
               variant: "destructive",
             });
             return;
           }
-        } catch {
+        }
+        
+        // Check protocol
+        if (!['http:', 'https:', 'ftp:', 'mailto:', 'tel:'].includes(validUrl.protocol)) {
           toast({
-            title: "Error",
-            description: "Please enter a valid URL",
+            title: "⚠️ Unsupported URL Protocol",
+            description: `Only HTTP, HTTPS, FTP, Email (mailto:), and Phone (tel:) URLs are supported. Found: ${validUrl.protocol}`,
             variant: "destructive",
           });
           return;
         }
         
-        // For dynamic QRs, we'll use our redirect service
-        qrUrl = qrType === 'dynamic' ? `${window.location.origin}/qr/PLACEHOLDER` : destinationUrl;
+        // Check for suspicious URLs
+        const suspiciousDomains = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.', '10.0.', '172.16.'];
+        if (suspiciousDomains.some(domain => validUrl.hostname.includes(domain))) {
+          toast({
+            title: "⚠️ Local URL Detected",
+            description: "Local URLs (localhost, private IPs) may not work when shared publicly.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Use the properly formatted URL
+        const finalUrl = validUrl.toString();
+        qrUrl = qrType === 'dynamic' ? `${window.location.origin}/qr/PLACEHOLDER` : finalUrl;
         break;
         
       case 'multi-url':
-        if (multiUrls.some(url => !url.url.trim())) {
+        if (multiUrls.length === 0) {
           toast({
-            title: "Error",
-            description: "Please fill in all URLs",
+            title: "⚠️ No URLs Configured",
+            description: "Please add at least one URL for your multi-URL QR code.",
             variant: "destructive",
           });
           return;
         }
+        
+        const emptyUrls = multiUrls.filter(url => !url.url.trim());
+        if (emptyUrls.length > 0) {
+          toast({
+            title: "⚠️ Empty URLs Found",
+            description: `Please fill in all URL fields or remove empty ones. Found ${emptyUrls.length} empty URL(s).`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate each URL
+        for (let i = 0; i < multiUrls.length; i++) {
+          const urlEntry = multiUrls[i];
+          if (urlEntry.url.length > 2000) {
+            toast({
+              title: "⚠️ URL Too Long",
+              description: `URL #${i + 1} is too long (${urlEntry.url.length} characters). Maximum allowed: 2000.`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          try {
+            new URL(urlEntry.url.startsWith('http') ? urlEntry.url : 'https://' + urlEntry.url);
+          } catch {
+            toast({
+              title: "⚠️ Invalid URL Format",
+              description: `URL #${i + 1} "${urlEntry.url.substring(0, 50)}..." is not a valid URL.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+        
         qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
         break;
         
       case 'action':
-        if (actionType === 'email' && !actionData.email) {
-          toast({
-            title: "Error",
-            description: "Please enter an email address",
-            variant: "destructive",
-          });
-          return;
+        if (actionType === 'email') {
+          if (!actionData.email?.trim()) {
+            toast({
+              title: "⚠️ Email Required",
+              description: "Please enter an email address for the email action.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Basic email validation
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(actionData.email)) {
+            toast({
+              title: "⚠️ Invalid Email",
+              description: "Please enter a valid email address (e.g., user@example.com).",
+              variant: "destructive",
+            });
+            return;
+          }
         }
-        if ((actionType === 'phone' || actionType === 'sms') && !actionData.phone) {
-          toast({
-            title: "Error",
-            description: "Please enter a phone number",
-            variant: "destructive",
-          });
-          return;
+        
+        if (actionType === 'phone' || actionType === 'sms') {
+          if (!actionData.phone?.trim()) {
+            toast({
+              title: "⚠️ Phone Number Required",
+              description: `Please enter a phone number for the ${actionType} action.`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Basic phone validation (international format)
+          const phoneRegex = /^[+]?[1-9]\d{1,14}$/;
+          const cleanPhone = actionData.phone.replace(/[\s\-\(\)]/g, '');
+          if (!phoneRegex.test(cleanPhone)) {
+            toast({
+              title: "⚠️ Invalid Phone Number",
+              description: "Please enter a valid phone number (e.g., +1234567890 or 1234567890).",
+              variant: "destructive",
+            });
+            return;
+          }
         }
+        
         qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
         break;
         
       case 'geo':
-        if (!geoData.latitude || !geoData.longitude) {
+        if (geoData.latitude === undefined || geoData.latitude === null || geoData.longitude === undefined || geoData.longitude === null) {
           toast({
-            title: "Error",
-            description: "Please set location coordinates",
+            title: "⚠️ Location Required",
+            description: "Please set latitude and longitude coordinates for the geo-location QR code.",
             variant: "destructive",
           });
           return;
         }
+        
+        // Validate coordinate ranges
+        if (geoData.latitude < -90 || geoData.latitude > 90) {
+          toast({
+            title: "⚠️ Invalid Latitude",
+            description: "Latitude must be between -90 and 90 degrees.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (geoData.longitude < -180 || geoData.longitude > 180) {
+          toast({
+            title: "⚠️ Invalid Longitude",
+            description: "Longitude must be between -180 and 180 degrees.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
         break;
         
@@ -181,12 +327,23 @@ export const QRGenerator = () => {
       case 'text':
         if (!textContent.trim()) {
           toast({
-            title: "Error",
-            description: "Please enter some text content",
+            title: "⚠️ Text Required",
+            description: "Please enter some text content for your text QR code.",
             variant: "destructive",
           });
           return;
         }
+        
+        // Check text length (QR codes have practical limits)
+        if (textContent.length > 2000) {
+          toast({
+            title: "⚠️ Text Too Long",
+            description: `Text content is too long (${textContent.length} characters). Maximum recommended: 2000 characters for optimal scanning.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
         // For text, we'll encode directly
         qrUrl = textContent;
         break;
@@ -469,9 +626,133 @@ export const QRGenerator = () => {
       a.download = (title ? `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}` : 'qr_code') + '.svg';
       a.click();
       URL.revokeObjectURL(url);
-      toast({ title: 'Downloaded', description: 'SVG downloaded successfully.' });
+      toast({ 
+        title: '✓ Downloaded Successfully', 
+        description: 'SVG file has been downloaded to your device.',
+        duration: 3000
+      });
     } catch {
-      toast({ title: 'Error', description: 'Failed to create SVG', variant: 'destructive' });
+      toast({ 
+        title: '✗ Download Failed', 
+        description: 'Could not generate SVG file. Please try again.', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const downloadPDF = async () => {
+    if (!qrCodeDataUrl) return;
+    
+    try {
+      // Create a new jsPDF instance
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Set up the page
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      // Add title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      const qrTitle = title || 'QR Code';
+      const titleWidth = pdf.getStringUnitWidth(qrTitle) * 20 / pdf.internal.scaleFactor;
+      pdf.text(qrTitle, (pageWidth - titleWidth) / 2, 30);
+      
+      // Add QR code image
+      const qrSize = 80; // Size in mm
+      const qrX = (pageWidth - qrSize) / 2;
+      const qrY = 50;
+      
+      pdf.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+      
+      // Add QR type and content info
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      
+      let yPosition = qrY + qrSize + 20;
+      
+      // Add QR type
+      pdf.text(`Type: ${qrType.charAt(0).toUpperCase() + qrType.slice(1).replace('-', ' ')}`, 20, yPosition);
+      yPosition += 10;
+      
+      // Add content based on type
+      let contentText = '';
+      switch (qrType) {
+        case 'static':
+        case 'dynamic':
+          contentText = destinationUrl;
+          break;
+        case 'multi-url':
+          contentText = `${multiUrls.length} URLs configured`;
+          break;
+        case 'action':
+          contentText = `${actionType} action`;
+          if (actionData.email) contentText += ` → ${actionData.email}`;
+          if (actionData.phone) contentText += ` → ${actionData.phone}`;
+          break;
+        case 'geo':
+          contentText = geoData.address || `${geoData.latitude}, ${geoData.longitude}`;
+          break;
+        case 'vcard':
+          const name = `${vCardData.firstName || ''} ${vCardData.lastName || ''}`.trim();
+          contentText = name || 'Contact card';
+          break;
+        case 'text':
+          contentText = textContent.substring(0, 100) + (textContent.length > 100 ? '...' : '');
+          break;
+        case 'event':
+          contentText = eventData.title || 'Event';
+          break;
+      }
+      
+      // Split long content into multiple lines
+      if (contentText) {
+        pdf.text('Content:', 20, yPosition);
+        yPosition += 8;
+        
+        const maxWidth = pageWidth - 40;
+        const lines = pdf.splitTextToSize(contentText, maxWidth);
+        pdf.text(lines, 20, yPosition);
+        yPosition += lines.length * 6;
+      }
+      
+      // Add description if exists
+      if (description) {
+        yPosition += 10;
+        pdf.text('Description:', 20, yPosition);
+        yPosition += 8;
+        
+        const maxWidth = pageWidth - 40;
+        const descLines = pdf.splitTextToSize(description, maxWidth);
+        pdf.text(descLines, 20, yPosition);
+      }
+      
+      // Add generation info at the bottom
+      pdf.setFontSize(10);
+      pdf.setTextColor(128);
+      const dateStr = new Date().toLocaleString();
+      pdf.text(`Generated on ${dateStr} by QRCode Canvas Pro`, 20, pageHeight - 20);
+      
+      // Save the PDF
+      const filename = title ? `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_qr.pdf` : 'qr_code.pdf';
+      pdf.save(filename);
+      
+      toast({ 
+        title: '✓ PDF Downloaded Successfully', 
+        description: 'PDF file has been downloaded with your QR code and details.',
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast({ 
+        title: '✗ PDF Download Failed', 
+        description: 'Could not generate PDF file. Please try again.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -485,8 +766,17 @@ export const QRGenerator = () => {
         const filename = title ? `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_qr.png` : 'qr_code.png';
         saveAs(blob, filename);
         toast({
-          title: "Downloaded!",
-          description: "QR code has been downloaded successfully.",
+          title: "✓ PNG Downloaded Successfully",
+          description: "QR code image has been saved to your device.",
+          duration: 3000
+        });
+      })
+      .catch(error => {
+        console.error('Download failed:', error);
+        toast({
+          title: "✗ Download Failed",
+          description: "Could not download QR code. Please try again.",
+          variant: "destructive"
         });
       });
   };
@@ -722,7 +1012,7 @@ export const QRGenerator = () => {
         <p className="text-gray-600">Generate professional QR codes for your business needs</p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-8 lg:grid-cols-2 mobile-grid">
         <Card className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200">
           <CardHeader className="pb-6">
             <CardTitle className="flex items-center gap-2 text-xl">
@@ -735,26 +1025,60 @@ export const QRGenerator = () => {
           </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <Label htmlFor="title" className="text-sm font-medium">Title</Label>
+            <div className="flex justify-between items-center">
+              <Label htmlFor="title" className="text-sm font-medium">
+                Title <span className="text-red-500" aria-hidden="true">*</span>
+              </Label>
+              <span className={`text-xs ${title.length > 100 ? 'text-red-500' : 'text-gray-500'}`}>
+                {title.length}/100
+              </span>
+            </div>
             <Input
               id="title"
-              placeholder="Enter QR code title"
+              placeholder="Enter QR code title (required)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="rounded-xl border-gray-200 focus:border-primary focus:ring-primary/20"
+              className={`rounded-xl border-gray-200 focus:border-primary focus:ring-primary/20 focus:ring-2 mobile-input ${
+                title.length > 100 ? 'border-red-300 focus:border-red-500' : ''
+              }`}
+              maxLength={120}
+              required
+              aria-describedby={title.length > 100 ? "title-error" : "title-help"}
             />
+            {title.length > 100 ? (
+              <p id="title-error" className="text-xs text-red-500" role="alert">
+                Title is too long. Please reduce by {title.length - 100} characters.
+              </p>
+            ) : (
+              <p id="title-help" className="text-xs text-gray-500">
+                Give your QR code a descriptive name for easy identification.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
-            <Textarea
-              id="description"
-              placeholder="Enter description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="smooth-transition"
-              rows={3}
-            />
+            <div className="flex justify-between items-center">
+              <Label htmlFor="description">Description (optional)</Label>
+              <span className={`text-xs ${description.length > 500 ? 'text-red-500' : 'text-gray-500'}`}>
+                {description.length}/500
+              </span>
+            </div>
+              <Textarea
+                id="description"
+                placeholder="Enter description (helps users understand your QR code)"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className={`smooth-transition mobile-input ${
+                  description.length > 500 ? 'border-red-300 focus:border-red-500' : ''
+                }`}
+                rows={3}
+                maxLength={520} // Allow slight overage
+              />
+            {description.length > 500 && (
+              <p className="text-xs text-red-500">
+                Description is too long. Please reduce by {description.length - 500} characters.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -893,15 +1217,31 @@ export const QRGenerator = () => {
           {/* Static/Dynamic URL Input as larger textarea */}
           {(qrType === 'static' || qrType === 'dynamic') && (
             <div className="space-y-2">
-              <Label htmlFor="url">Destination URL</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="url">Destination URL</Label>
+                <span className={`text-xs ${destinationUrl.length > 2000 ? 'text-red-500' : 'text-gray-500'}`}>
+                  {destinationUrl.length}/2000
+                </span>
+              </div>
               <Textarea
                 id="url"
-                placeholder="https://example.com"
+                placeholder="https://example.com or www.example.com"
                 value={destinationUrl}
                 onChange={(e) => setDestinationUrl(e.target.value)}
                 rows={4}
-                className="smooth-transition text-base rounded-xl"
+                className={`smooth-transition text-base rounded-xl ${
+                  destinationUrl.length > 2000 ? 'border-red-300 focus:border-red-500' : ''
+                }`}
+                maxLength={2100} // Allow slight overage
               />
+              {destinationUrl.length > 2000 && (
+                <p className="text-xs text-red-500">
+                  URL is too long. Please reduce by {destinationUrl.length - 2000} characters.
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                Supported: HTTP/HTTPS websites, FTP, email (mailto:), phone (tel:)
+              </p>
             </div>
           )}
 
@@ -1141,15 +1481,28 @@ export const QRGenerator = () => {
           {/* Text Configuration */}
           {qrType === 'text' && (
             <div className="space-y-2">
-              <Label htmlFor="text-content">Text Content</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="text-content">Text Content</Label>
+                <span className={`text-xs ${textContent.length > 2000 ? 'text-red-500' : 'text-gray-500'}`}>
+                  {textContent.length}/2000
+                </span>
+              </div>
               <Textarea
                 id="text-content"
                 placeholder="Enter any text content you want to encode in the QR code..."
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
                 rows={4}
-                className="smooth-transition"
+                className={`smooth-transition ${
+                  textContent.length > 2000 ? 'border-red-300 focus:border-red-500' : ''
+                }`}
+                maxLength={2100} // Allow slight overage
               />
+              {textContent.length > 2000 && (
+                <p className="text-xs text-red-500">
+                  Text is too long. Please reduce by {textContent.length - 2000} characters for optimal scanning.
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 This text will be displayed when the QR code is scanned
               </p>
@@ -1267,29 +1620,45 @@ export const QRGenerator = () => {
                 />
               </div>
               
-              <div className="flex gap-3">
-                <Button 
-                  onClick={downloadQR} 
-                  variant="outline"
-                  className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
-                </Button>
+              <div className="space-y-3">
+                {/* Primary download options */}
+                <div className="flex gap-2 sm:gap-2 mobile-button-group">
+                  <Button 
+                    onClick={downloadQR} 
+                    variant="outline"
+                    className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50 mobile-touch"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">PNG</span>
+                    <span className="sm:hidden">PNG Image</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={downloadSVG}
+                    variant="outline"
+                    className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50 mobile-touch"
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">SVG</span>
+                    <span className="sm:hidden">SVG Vector</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={downloadPDF}
+                    variant="outline"
+                    className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50 mobile-touch"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">PDF</span>
+                    <span className="sm:hidden">PDF Document</span>
+                  </Button>
+                </div>
                 
-                <Button 
-                  onClick={downloadSVG}
-                  variant="outline"
-                  className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50"
-                >
-                  <FileDown className="mr-2 h-4 w-4" />
-                  Download SVG
-                </Button>
-
+                {/* Save button */}
                 <Button 
                   onClick={saveQR} 
                   disabled={saving}
-                  className="flex-1 bg-secondary hover:bg-secondary-hover text-white rounded-xl shadow-md"
+                  className="w-full bg-secondary hover:bg-secondary-hover text-white rounded-xl shadow-md"
                 >
                   {saving ? (
                     <>
@@ -1299,7 +1668,7 @@ export const QRGenerator = () => {
                   ) : (
                     <>
                       <Save className="mr-2 h-4 w-4" />
-                      Save
+                      Save to Dashboard
                     </>
                   )}
                 </Button>

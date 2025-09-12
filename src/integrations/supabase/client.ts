@@ -13,5 +13,27 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'implicit',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'qrcode-canvas-pro@1.0.0'
+    }
   }
 });
+
+// Add global error handler for auth errors to prevent console spam
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    const error = event.reason;
+    if (error?.message?.includes('Invalid Refresh Token') || 
+        error?.message?.includes('Refresh Token Not Found') ||
+        error?.message?.includes('JWT expired')) {
+      // Prevent these specific auth errors from spamming the console
+      // They're handled by AuthWrapper
+      event.preventDefault();
+      console.warn('Auth token error (handled by AuthWrapper):', error.message);
+    }
+  });
+}

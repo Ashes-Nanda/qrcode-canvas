@@ -23,13 +23,14 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
     try {
       await navigator.clipboard.writeText(text);
       toast({
-        title: "Copied!",
-        description: "Link copied to clipboard",
+        title: "✓ Link Copied Successfully",
+        description: "QR code link has been copied to your clipboard and is ready to share.",
+        duration: 3000
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to copy to clipboard",
+        title: "✗ Copy Failed",
+        description: "Could not copy link to clipboard. Please try selecting and copying manually.",
         variant: "destructive",
       });
     }
@@ -39,11 +40,21 @@ export const QRShare = ({ qrId, title, qrType }: QRShareProps) => {
     const subject = encodeURIComponent(`QR Code: ${title}`);
     const body = encodeURIComponent(`${shareText}\n\n${shareUrl}`);
     window.open(`mailto:?subject=${subject}&body=${body}`);
+    toast({
+      title: "📧 Email Client Opened",
+      description: "Your default email app should now be open with the QR code link ready to send.",
+      duration: 3000
+    });
   };
 
   const shareViaSMS = () => {
     const message = encodeURIComponent(`${shareText} ${shareUrl}`);
     window.open(`sms:?body=${message}`);
+    toast({
+      title: "📱 SMS App Opened",
+      description: "Your messaging app should now be open with the QR code link ready to send.",
+      duration: 3000
+    });
   };
 
   const shareViaWebShare = async () => {

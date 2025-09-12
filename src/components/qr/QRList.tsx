@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode, Copy, Grid2X2, Rows, Search, EyeIcon, Download, Share2, Calendar, Activity } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { EnhancedEmptyState } from '@/components/ui/enhanced-empty-state';
 import { QRShare } from './QRShare';
 import { QREditModal } from './QREditModal';
@@ -71,11 +72,15 @@ const QRCodeImage = ({ qrId, className }: { qrId: string; className?: string }) 
   );
 };
 
-export const QRList = () => {
+import React from 'react';
+
+const QRListComponent = () => {
   const [qrCodes, setQrCodes] = useState<QRCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedQR, setSelectedQR] = useState<QRCode | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [qrToDelete, setQrToDelete] = useState<QRCode | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'scans_desc' | 'scans_asc'>('date_desc');
@@ -111,7 +116,7 @@ export const QRList = () => {
     }
   };
 
-  const deleteQRCode = async (id: string) => {
+  const deleteQRCode = useCallback(async (id: string) => {
     try {
       const { error } = await supabase
         .from('qr_codes')
@@ -122,19 +127,34 @@ export const QRList = () => {
 
       setQrCodes(qrCodes.filter(qr => qr.id !== id));
       toast({
-        title: "Deleted",
-        description: "QR code has been deleted successfully.",
+        title: "✓ QR Code Deleted",
+        description: "QR code has been permanently removed from your dashboard.",
+        duration: 4000
       });
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message,
+        title: "✗ Delete Failed",
+        description: "Could not delete QR code. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setQrToDelete(null);
     }
-  };
+  }, [qrCodes, toast]);
+  
+  const handleDeleteClick = useCallback((qr: QRCode) => {
+    setQrToDelete(qr);
+    setDeleteDialogOpen(true);
+  }, []);
+  
+  const confirmDelete = useCallback(() => {
+    if (qrToDelete) {
+      deleteQRCode(qrToDelete.id);
+    }
+  }, [qrToDelete, deleteQRCode]);
 
-  const toggleActive = async (id: string, currentActive: boolean) => {
+  const toggleActive = useCallback(async (id: string, currentActive: boolean) => {
     try {
       const { error } = await supabase
         .from('qr_codes')
@@ -158,7 +178,7 @@ export const QRList = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [qrCodes, toast]);
 
   const handleEdit = (qr: QRCode) => {
     setSelectedQR(qr);
@@ -171,30 +191,44 @@ export const QRList = () => {
     setSelectedQR(null);
   };
 
-  const filtered = qrCodes
-    .filter((qr) => typeFilter === 'all' ? true : qr.qr_type === typeFilter)
-    .filter((qr) =>
-      search.trim() ?
-        (qr.title?.toLowerCase().includes(search.toLowerCase()) || qr.id.includes(search)) : true
-    )
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'date_asc':
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case 'scans_desc':
-          return (b.scan_count || 0) - (a.scan_count || 0);
-        case 'scans_asc':
-          return (a.scan_count || 0) - (b.scan_count || 0);
-        case 'date_desc':
-        default:
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      }
-    });
+  const filtered = useMemo(() => {
+    return qrCodes
+      .filter((qr) => typeFilter === 'all' ? true : qr.qr_type === typeFilter)
+      .filter((qr) =>
+        search.trim() ?
+          (qr.title?.toLowerCase().includes(search.toLowerCase()) || qr.id.includes(search)) : true
+      )
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'date_asc':
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          case 'scans_desc':
+            return (b.scan_count || 0) - (a.scan_count || 0);
+          case 'scans_asc':
+            return (a.scan_count || 0) - (b.scan_count || 0);
+          case 'date_desc':
+          default:
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+      });
+  }, [qrCodes, typeFilter, search, sortBy]);
 
-  const copyShareLink = async (id: string) => {
-    const link = `${window.location.origin}/qr/${id}`;
-    await navigator.clipboard.writeText(link);
-    toast({ title: 'Copied', description: 'Share link copied to clipboard.' });
+  const copyShareLink = async (id: string, title?: string) => {
+    try {
+      const link = `${window.location.origin}/qr/${id}`;
+      await navigator.clipboard.writeText(link);
+      toast({ 
+        title: '✓ Link Copied Successfully', 
+        description: `QR code link${title ? ` for "${title}"` : ''} has been copied to your clipboard.`,
+        duration: 3000
+      });
+    } catch (error) {
+      toast({ 
+        title: '✗ Copy Failed', 
+        description: 'Could not copy link to clipboard. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const downloadQRCode = async (id: string, title: string) => {
@@ -325,31 +359,49 @@ export const QRList = () => {
           <Badge variant="secondary" className="text-sm px-3 py-1 rounded-xl">
             {filtered.length} shown
           </Badge>
-          <Button variant={viewMode === 'grid' ? 'secondary' : 'outline'} size="sm" className="rounded-xl" onClick={() => setViewMode('grid')}>
+          <Button 
+            variant={viewMode === 'grid' ? 'secondary' : 'outline'} 
+            size="sm" 
+            className="rounded-xl" 
+            onClick={() => setViewMode('grid')}
+            aria-label="Switch to grid view"
+          >
             <Grid2X2 className="h-4 w-4 mr-1" /> Grid
           </Button>
-          <Button variant={viewMode === 'table' ? 'secondary' : 'outline'} size="sm" className="rounded-xl" onClick={() => setViewMode('table')}>
+          <Button 
+            variant={viewMode === 'table' ? 'secondary' : 'outline'} 
+            size="sm" 
+            className="rounded-xl" 
+            onClick={() => setViewMode('table')}
+            aria-label="Switch to table view"
+          >
             <Rows className="h-4 w-4 mr-1" /> Table
           </Button>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative">
+      <div className="flex flex-wrap gap-3 items-center mobile-button-group">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
-            className="pl-9 pr-3 py-2 text-sm rounded-xl border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="pl-9 pr-3 py-2 text-sm rounded-xl border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-full mobile-input"
             placeholder="Search by name or ID"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
-          className="px-3 py-2 text-sm rounded-xl border border-input bg-background"
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
+        <div className="flex flex-col gap-1">
+          <label htmlFor="qr-type-filter" className="text-xs text-muted-foreground sr-only">
+            Filter by QR type
+          </label>
+          <select
+            id="qr-type-filter"
+            className="px-3 py-2 text-sm rounded-xl border border-input bg-background mobile-input mobile-touch"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            aria-label="Filter QR codes by type"
+          >
           <option value="all">All types</option>
           <option value="static">Static</option>
           <option value="dynamic">Dynamic</option>
@@ -359,21 +411,29 @@ export const QRList = () => {
           <option value="vcard">vCard</option>
           <option value="text">Text</option>
           <option value="event">Event</option>
-        </select>
-        <select
-          className="px-3 py-2 text-sm rounded-xl border border-input bg-background"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
-        >
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="qr-sort-order" className="text-xs text-muted-foreground sr-only">
+            Sort order
+          </label>
+          <select
+            id="qr-sort-order"
+            className="px-3 py-2 text-sm rounded-xl border border-input bg-background mobile-input mobile-touch"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            aria-label="Sort QR codes by date or scans"
+          >
           <option value="date_desc">Newest</option>
           <option value="date_asc">Oldest</option>
           <option value="scans_desc">Most scans</option>
           <option value="scans_asc">Least scans</option>
-        </select>
+          </select>
+        </div>
       </div>
 
       {viewMode === 'grid' ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mobile-grid">
           {/* Gallery View - Visual QR Code Cards */}
           {filtered.map((qr) => (
             <Card key={qr.id} className="rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.02] overflow-hidden group border-0 bg-white">
@@ -400,7 +460,7 @@ export const QRList = () => {
                         <Eye className="mr-2 h-4 w-4" />
                         {qr.is_active ? 'Deactivate' : 'Activate'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => deleteQRCode(qr.id)} className="text-destructive">
+                      <DropdownMenuItem onClick={() => handleDeleteClick(qr)} className="text-destructive">
                         <Trash2 className="mr-2 h-4 w-4" />Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -472,7 +532,7 @@ export const QRList = () => {
                     variant="outline" 
                     size="sm" 
                     className="flex-1 rounded-xl h-9 text-xs"
-                    onClick={() => copyShareLink(qr.id)}
+                    onClick={() => copyShareLink(qr.id, qr.title)}
                   >
                     <Copy className="w-3 h-3 mr-1" /> Copy Link
                   </Button>
@@ -499,10 +559,10 @@ export const QRList = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mobile-table-scroll">
           {/* Enhanced Table View */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto mobile-table-scroll">
+            <table className="w-full min-w-[600px]">
               <thead className="bg-gradient-to-r from-primary/5 to-primary/10 border-b border-gray-100">
                 <tr className="text-sm font-semibold text-foreground">
                   <th className="text-left p-4 min-w-[200px]">
@@ -623,6 +683,7 @@ export const QRList = () => {
                           variant="ghost" 
                           className="h-8 w-8 p-0 hover:bg-primary/10"
                           onClick={() => handleEdit(qr)}
+                          aria-label={`Edit QR code ${qr.title}`}
                           title="Edit QR"
                         >
                           <Edit className="h-3.5 w-3.5" />
@@ -632,6 +693,7 @@ export const QRList = () => {
                           variant="ghost" 
                           className="h-8 w-8 p-0 hover:bg-primary/10"
                           onClick={() => downloadQRCode(qr.id, qr.title)}
+                          aria-label={`Download QR code ${qr.title}`}
                           title="Download QR"
                         >
                           <Download className="h-3.5 w-3.5" />
@@ -640,7 +702,8 @@ export const QRList = () => {
                           size="sm" 
                           variant="ghost" 
                           className="h-8 w-8 p-0 hover:bg-primary/10"
-                          onClick={() => copyShareLink(qr.id)}
+                          onClick={() => copyShareLink(qr.id, qr.title)}
+                          aria-label={`Copy share link for ${qr.title}`}
                           title="Copy Link"
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -656,7 +719,7 @@ export const QRList = () => {
                               <Eye className="mr-2 h-4 w-4" />
                               {qr.is_active ? 'Deactivate' : 'Activate'}
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => deleteQRCode(qr.id)} className="text-destructive">
+                            <DropdownMenuItem onClick={() => handleDeleteClick(qr)} className="text-destructive">
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
@@ -693,6 +756,27 @@ export const QRList = () => {
         qrCode={selectedQR}
         onUpdate={handleEditUpdate}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete QR code?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete
+              <span className="font-semibold"> {qrToDelete?.title}</span> and remove its analytics.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
+
+export const QRList = React.memo(QRListComponent);

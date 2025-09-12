@@ -399,9 +399,30 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
         }
       };
 
-      // Update destination URL for static QRs
-      if (qrCode.qr_type === 'static') {
-        updateData.destination_url = destinationUrl;
+      // Update destination URL for static and dynamic QRs
+      if (qrCode.qr_type === 'static' || qrCode.qr_type === 'dynamic') {
+        if (!destinationUrl.trim()) {
+          toast({
+            title: "⚠️ URL Required",
+            description: "Please enter a destination URL.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate URL format
+        try {
+          const url = destinationUrl.startsWith('http') ? destinationUrl : `https://${destinationUrl}`;
+          new URL(url);
+          updateData.destination_url = url;
+        } catch {
+          toast({
+            title: "⚠️ Invalid URL",
+            description: "Please enter a valid URL format.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       // Store logo data URL if present (in a real app, you'd upload to storage)
@@ -417,8 +438,11 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
       if (error) throw error;
 
       toast({
-        title: "Updated!",
-        description: "QR code has been updated successfully.",
+        title: "✓ QR Code Updated Successfully",
+        description: qrCode.qr_type === 'dynamic' 
+          ? "Your dynamic QR code has been updated. All existing QR codes will now redirect to the new URL!"
+          : "Your QR code details and design have been updated successfully.",
+        duration: 4000
       });
 
       onUpdate();
@@ -462,7 +486,7 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
           <div className="space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Basic Information</h3>
+              <h2 className="text-lg font-semibold">Basic Information</h2>
               
               <div className="space-y-2">
                 <Label htmlFor="edit-title">Title</Label>
@@ -487,17 +511,28 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
                 />
               </div>
 
-              {qrCode.qr_type === 'static' && (
+              {(qrCode.qr_type === 'static' || qrCode.qr_type === 'dynamic') && (
                 <div className="space-y-2">
-                  <Label htmlFor="edit-url">Destination URL</Label>
-                  <Input
+                  <Label htmlFor="edit-url">
+                    Destination URL 
+                    {qrCode.qr_type === 'dynamic' && (
+                      <span className="text-sm text-gray-500 font-normal">(can be updated anytime)</span>
+                    )}
+                  </Label>
+                  <Textarea
                     id="edit-url"
-                    type="url"
                     value={destinationUrl}
                     onChange={(e) => setDestinationUrl(e.target.value)}
                     placeholder="https://example.com"
                     className="rounded-xl"
+                    rows={3}
                   />
+                  <div className="flex justify-between items-center text-xs text-gray-500">
+                    <span>{destinationUrl.length}/2000 characters</span>
+                    {qrCode.qr_type === 'dynamic' && (
+                      <span className="text-blue-600">✨ Dynamic QR - updates instantly without reprinting</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -505,10 +540,10 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
             {/* Design Options */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
                   <Palette className="h-5 w-5" />
                   Design Options
-                </h3>
+                </h2>
                 <Button
                   type="button"
                   variant="outline"

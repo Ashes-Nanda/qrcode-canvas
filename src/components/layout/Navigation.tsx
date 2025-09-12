@@ -61,7 +61,15 @@ export const Navigation = ({
   ];
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <>
+      {/* Skip Links for Keyboard Navigation */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[9999] bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium"
+      >
+        Skip to main content
+      </a>
+      <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -113,6 +121,7 @@ export const Navigation = ({
               <Button
                 variant="ghost"
                 className="relative h-10 w-10 rounded-full"
+                aria-label="Open user menu"
               >
                 <Avatar className="h-10 w-10">
                   <AvatarImage
@@ -168,12 +177,15 @@ export const Navigation = ({
                   ? "text-primary bg-primary/5 border-t-2 border-primary"
                   : "text-gray-600 hover:text-primary"
               }`}
+              aria-label={`Navigate to ${item.label}`}
+              aria-current={activeTab === item.id ? 'page' : undefined}
             >
               {item.label}
             </button>
           ))}
         </div>
       </div>
-    </nav>
+      </nav>
+    </>
   );
 };

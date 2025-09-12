@@ -75,6 +75,13 @@ const QuickTipsAccordion: React.FC = () => {
     advanced: 'text-orange-600 bg-orange-100',
   };
 
+  const isItemOpen = (itemId: string) => openItems.includes(itemId);
+  
+  // Debug function to log state changes
+  React.useEffect(() => {
+    console.log('Quick tips accordion openItems:', openItems);
+  }, [openItems]);
+
   const handleExternalLink = (link?: string) => {
     if (link) {
       // In a real app, you'd use your router here
@@ -96,13 +103,20 @@ const QuickTipsAccordion: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Accordion type="multiple" value={openItems} onValueChange={setOpenItems}>
+        <Accordion 
+          type="multiple" 
+          value={openItems} 
+          onValueChange={(value) => {
+            console.log('Accordion value changed to:', value);
+            setOpenItems(value);
+          }}
+        >
           {quickTips.map((tip) => {
             const Icon = tip.icon;
             return (
               <AccordionItem key={tip.id} value={tip.id} className="border-none">
-                <AccordionTrigger className="hover:no-underline hover:bg-muted/50 rounded-lg px-2 py-1.5 text-left">
-                  <div className="flex items-center gap-2">
+                <AccordionTrigger className="hover:no-underline hover:bg-muted/50 rounded-lg px-2 py-1.5 text-left [&>svg]:hidden">
+                  <div className="flex items-center gap-2 flex-1">
                     <div className={`p-1 rounded ${categoryColors[tip.category]}`}>
                       <Icon className="h-3 w-3" />
                     </div>
@@ -110,24 +124,27 @@ const QuickTipsAccordion: React.FC = () => {
                       <p className="font-medium text-xs">{tip.title}</p>
                       <p className="text-xs text-muted-foreground">{tip.description}</p>
                     </div>
+                    <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-200 ${
+                      isItemOpen(tip.id) ? 'rotate-180' : 'rotate-0'
+                    }`} />
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-2 pb-2">
-                  <div className="pl-6 space-y-2">
-                    <ul className="space-y-1 text-xs text-gray-600">
+                  <div className="pl-6 space-y-2 bg-gray-50 rounded-lg p-2">
+                    <div className="text-xs text-gray-600 space-y-1">
                       {tip.details.map((detail, index) => (
-                        <li key={index} className="flex items-start gap-1">
+                        <div key={index} className="flex items-start gap-1">
                           <ArrowRight className="h-2.5 w-2.5 text-secondary mt-0.5 flex-shrink-0" />
                           <span>{detail}</span>
-                        </li>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                     {tip.actionText && (
                       <Button
                         variant="ghost" 
                         size="sm"
                         onClick={() => handleExternalLink(tip.actionLink)}
-                        className="text-primary hover:bg-primary/10 px-0 h-auto font-medium text-xs"
+                        className="text-primary hover:bg-primary/10 px-0 h-auto font-medium text-xs mt-2"
                       >
                         {tip.actionText}
                         <ExternalLink className="h-2.5 w-2.5 ml-1" />
