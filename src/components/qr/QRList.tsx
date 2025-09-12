@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode, Copy, Grid2X2, Rows, Search, EyeIcon } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode, Copy, Grid2X2, Rows, Search, EyeIcon, Download, Share2, Calendar, Activity } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EnhancedEmptyState } from '@/components/ui/enhanced-empty-state';
 import { QRShare } from './QRShare';
 import { QREditModal } from './QREditModal';
 import { format } from 'date-fns';
@@ -26,6 +27,49 @@ interface QRCode {
   created_at: string;
   updated_at: string;
 }
+
+// Component for displaying QR code images
+const QRCodeImage = ({ qrId, className }: { qrId: string; className?: string }) => {
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const generateQRImage = async () => {
+      try {
+        const url = `${window.location.origin}/qr/${qrId}`;
+        const dataUrl = await QRCode.toDataURL(url, {
+          width: 200,
+          margin: 2,
+          color: { dark: '#2e266d', light: '#FFFFFF' },
+          errorCorrectionLevel: 'M'
+        });
+        setQrDataUrl(dataUrl);
+      } catch (error) {
+        console.error('Failed to generate QR code:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    generateQRImage();
+  }, [qrId]);
+
+  if (loading) {
+    return (
+      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+        <QrCode className="w-8 h-8 text-gray-400 animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={qrDataUrl} 
+      alt="QR Code" 
+      className={`rounded-lg ${className}`}
+      style={{ imageRendering: 'pixelated' }}
+    />
+  );
+};
 
 export const QRList = () => {
   const [qrCodes, setQrCodes] = useState<QRCode[]>([]);
@@ -153,13 +197,81 @@ export const QRList = () => {
     toast({ title: 'Copied', description: 'Share link copied to clipboard.' });
   };
 
-  const previewDataUrl = async (id: string) => {
-    const url = `${window.location.origin}/qr/${id}`;
-    return await QRCode.toDataURL(url, {
-      width: 200,
-      margin: 2,
-      color: { dark: '#2e266d', light: '#FFFFFF' },
-    });
+  const downloadQRCode = async (id: string, title: string) => {
+    try {
+      const url = `${window.location.origin}/qr/${id}`;
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 512,
+        margin: 2,
+        color: { dark: '#2e266d', light: '#FFFFFF' },
+        errorCorrectionLevel: 'H'
+      });
+      
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_QR.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({ 
+        title: 'Downloaded', 
+        description: `QR code for "${title}" has been downloaded.` 
+      });
+    } catch (error) {
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to download QR code.',
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const getQRContent = (qr: QRCode) => {
+    switch (qr.qr_type) {
+      case 'static':
+      case 'dynamic':
+        return qr.destination_url || '';
+      case 'multi-url':
+        return `${qr.multi_urls?.length || 0} URLs configured`;
+      case 'action':
+        const actionText = qr.action_type ? `${qr.action_type} action` : 'Action';
+        if (qr.action_data?.email) return `${actionText} → ${qr.action_data.email}`;
+        if (qr.action_data?.phone) return `${actionText} → ${qr.action_data.phone}`;
+        return actionText;
+      case 'geo':
+        return qr.geo_data?.address || `${qr.geo_data?.latitude}, ${qr.geo_data?.longitude}`;
+      case 'vcard':
+        return qr.destination_url?.match(/FN:([^\n\r]+)/)?.[1] || 'Contact card';
+      case 'text':
+        return qr.destination_url?.substring(0, 100) + (qr.destination_url && qr.destination_url.length > 100 ? '...' : '') || '';
+      case 'event':
+        return qr.destination_url?.match(/SUMMARY:([^\n\r]+)/)?.[1] || 'Event';
+      default:
+        return qr.destination_url || '';
+    }
+  };
+
+  const getQRTypeIcon = (type: string) => {
+    switch (type) {
+      case 'static':
+      case 'dynamic':
+        return <ExternalLink className="w-3 h-3" />;
+      case 'multi-url':
+        return <Copy className="w-3 h-3" />;
+      case 'action':
+        return <Activity className="w-3 h-3" />;
+      case 'geo':
+        return <QrCode className="w-3 h-3" />;
+      case 'vcard':
+        return <Eye className="w-3 h-3" />;
+      case 'text':
+        return <Edit className="w-3 h-3" />;
+      case 'event':
+        return <Calendar className="w-3 h-3" />;
+      default:
+        return <QrCode className="w-3 h-3" />;
+    }
   };
 
   if (loading) {
@@ -191,15 +303,13 @@ export const QRList = () => {
           <h1 className="text-3xl font-bold text-foreground mb-2">Manage QR Codes</h1>
           <p className="text-gray-600">View and manage all your QR codes</p>
         </div>
-        <Card className="rounded-2xl shadow-md">
-          <CardContent className="p-12 text-center">
-          <div className="text-muted-foreground">
-            <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <h3 className="text-lg font-medium mb-2">0 Total Scans</h3>
-            <p>Create your first QR to tell people about your business!</p>
-          </div>
-        </CardContent>
-      </Card>
+        <EnhancedEmptyState 
+          variant="qr-list"
+          onAction={() => {
+            // Navigate to QR generator - this would be handled by the parent component
+            window.location.hash = '#/dashboard/generator';
+          }}
+        />
       </div>
     );
   }
@@ -263,187 +373,313 @@ export const QRList = () => {
       </div>
 
       {viewMode === 'grid' ? (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((qr) => (
-          <Card key={qr.id} className="rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Gallery View - Visual QR Code Cards */}
+          {filtered.map((qr) => (
+            <Card key={qr.id} className="rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.02] overflow-hidden group border-0 bg-white">
+              {/* QR Code Preview - Hero Section */}
+              <div className="relative bg-gradient-to-br from-primary/5 to-primary/10 p-6">
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="rounded-xl">
+                      <DropdownMenuItem onClick={() => handleEdit(qr)}>
+                        <Edit className="mr-2 h-4 w-4" />Edit QR
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => downloadQRCode(qr.id, qr.title)}>
+                        <Download className="mr-2 h-4 w-4" />Download
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => copyShareLink(qr.id)}>
+                        <Copy className="mr-2 h-4 w-4" />Copy Link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleActive(qr.id, qr.is_active)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        {qr.is_active ? 'Deactivate' : 'Activate'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => deleteQRCode(qr.id)} className="text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4" />Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                {/* Actual QR Code Image */}
+                <div className="flex justify-center">
+                  <div className="relative group/qr">
+                    <QRCodeImage 
+                      qrId={qr.id} 
+                      className="w-24 h-24 bg-white shadow-sm border-2 border-white cursor-pointer transition-transform duration-200 hover:scale-110" 
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover/qr:bg-black/10 transition-colors duration-200 rounded-lg flex items-center justify-center">
+                      <EyeIcon className="w-4 h-4 text-white opacity-0 group-hover/qr:opacity-100 transition-opacity duration-200" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <CardContent className="p-5 space-y-4">
+                {/* QR Title & Status */}
+                <div className="text-center space-y-2">
+                  <h3 className="font-semibold text-lg text-foreground truncate" title={qr.title}>
                     {qr.title}
+                  </h3>
+                  
+                  {/* Tags Row */}
+                  <div className="flex flex-wrap justify-center gap-1.5">
                     <Badge 
-                      variant={qr.is_active ? "secondary" : "outline"}
-                      className="text-xs"
+                      variant={qr.is_active ? 'default' : 'secondary'}
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        qr.is_active 
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
                     >
                       {qr.is_active ? 'Active' : 'Inactive'}
                     </Badge>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {qr.qr_type.replace('-', ' ')}
+                    <Badge variant="outline" className="text-xs px-2.5 py-1 rounded-full border-primary/30 text-primary bg-primary/5 hover:bg-primary/10">
+                      {getQRTypeIcon(qr.qr_type)}
+                      <span className="ml-1 capitalize">{qr.qr_type.replace('-', ' ')}</span>
                     </Badge>
-                  </CardTitle>
-                  {qr.description && (
-                    <CardDescription>{qr.description}</CardDescription>
-                  )}
-                </div>
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => copyShareLink(qr.id)}>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy share link
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => toggleActive(qr.id, qr.is_active)}
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      {qr.is_active ? 'Deactivate' : 'Activate'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(qr)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => deleteQRCode(qr.id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            
-            <CardContent>
-              <div className="space-y-3">
-                {/* Hover quick preview */}
-                <div className="group relative">
-                  <div className="absolute right-2 -top-10 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-xl"
-                      onClick={async () => {
-                        const dataUrl = await previewDataUrl(qr.id);
-                        const w = window.open('about:blank', '_blank');
-                        if (w) {
-                          w.document.write(`<img src="${dataUrl}" alt="QR Preview"/>`);
-                        }
-                      }}
-                    >
-                      <EyeIcon className="h-4 w-4 mr-1" /> Preview
-                    </Button>
-                    <Button variant="outline" size="sm" className="rounded-xl" onClick={() => copyShareLink(qr.id)}>
-                      <Copy className="h-4 w-4 mr-1" /> Copy
-                    </Button>
                   </div>
                 </div>
-                {/* Show different content based on QR type */}
-                {qr.qr_type === 'static' || qr.qr_type === 'dynamic' ? (
-                  qr.destination_url && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <ExternalLink className="h-4 w-4" />
-                      <span className="truncate">{qr.destination_url}</span>
-                    </div>
-                  )
-                ) : qr.qr_type === 'multi-url' ? (
-                  <div className="text-sm text-muted-foreground">
-                    <span className="font-medium">{qr.multi_urls?.length || 0}</span> URLs configured
-                  </div>
-                ) : qr.qr_type === 'action' ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="capitalize">{qr.action_type}</span> action
-                    {qr.action_data?.email && <span>→ {qr.action_data.email}</span>}
-                    {qr.action_data?.phone && <span>→ {qr.action_data.phone}</span>}
-                  </div>
-                ) : qr.qr_type === 'geo' ? (
-                  <div className="text-sm text-muted-foreground">
-                    {qr.geo_data?.address || `${qr.geo_data?.latitude}, ${qr.geo_data?.longitude}`}
-                  </div>
-                ) : qr.qr_type === 'vcard' ? (
-                  <div className="text-sm text-muted-foreground">
-                    Contact card for {qr.destination_url?.match(/FN:([^\n\r]+)/)?.[1] || 'Unknown'}
-                  </div>
-                ) : qr.qr_type === 'text' ? (
-                  <div className="text-sm text-muted-foreground">
-                    <span className="truncate">{qr.destination_url?.substring(0, 50)}{qr.destination_url && qr.destination_url.length > 50 ? '...' : ''}</span>
-                  </div>
-                ) : qr.qr_type === 'event' ? (
-                  <div className="text-sm text-muted-foreground">
-                    Event: {qr.destination_url?.match(/SUMMARY:([^\n\r]+)/)?.[1] || 'Unknown Event'}
-                  </div>
-                ) : null}
-                
-                {/* QR Code URL for sharing */}
-                {qr.qr_type !== 'static' && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <QrCode className="h-4 w-4" />
-                    <span className="truncate font-mono text-xs">
-                      {window.location.origin}/qr/{qr.id}
-                    </span>
-                  </div>
-                )}
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-4">
-                    <span className="text-muted-foreground">
-                      Scans: <span className="font-medium text-foreground">{qr.scan_count}</span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Created: {format(new Date(qr.created_at), 'MMM d, yyyy')}
+
+                {/* Content Preview */}
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground text-center px-2">
+                    <span className="line-clamp-2" title={getQRContent(qr)}>
+                      {getQRContent(qr)}
                     </span>
                   </div>
                   
+                  {/* QR Link Display */}
+                  <div className="bg-gray-50 rounded-lg p-2.5 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                      <QrCode className="w-3 h-3" />
+                      <span className="font-mono truncate">
+                        {window.location.origin.replace('https://', '').replace('http://', '')}/qr/{qr.id.slice(0, 8)}...
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 rounded-xl h-9 text-xs"
+                    onClick={() => copyShareLink(qr.id)}
+                  >
+                    <Copy className="w-3 h-3 mr-1" /> Copy Link
+                  </Button>
                   <QRShare 
                     qrId={qr.id} 
                     title={qr.title} 
                     qrType={qr.qr_type} 
                   />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+
+                {/* Stats Footer */}
+                <div className="flex justify-between items-center pt-3 border-t border-gray-100 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <BarChart3 className="w-3 h-3" />
+                    <span>{qr.scan_count} scans</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>{format(new Date(qr.created_at), 'MMM d')}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (
-        <div className="overflow-x-auto border rounded-2xl">
-          <table className="w-full text-sm">
-            <thead className="bg-primary/5 text-foreground">
-              <tr>
-                <th className="text-left p-3">QR Name</th>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Created</th>
-                <th className="text-left p-3">Last Scan</th>
-                <th className="text-left p-3">Active</th>
-                <th className="text-left p-3">Scans</th>
-                <th className="text-left p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((qr) => (
-                <tr key={qr.id} className="border-t">
-                  <td className="p-3 font-medium">{qr.title}</td>
-                  <td className="p-3 capitalize">{qr.qr_type.replace('-', ' ')}</td>
-                  <td className="p-3">{format(new Date(qr.created_at), 'MMM d, yyyy')}</td>
-                  <td className="p-3">—</td>
-                  <td className="p-3">{qr.is_active ? 'Active' : 'Inactive'}</td>
-                  <td className="p-3">{qr.scan_count}</td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="rounded-xl" onClick={() => handleEdit(qr)}>Edit</Button>
-                      <Button size="sm" variant="outline" className="rounded-xl" onClick={() => copyShareLink(qr.id)}>Copy</Button>
-                      <Button size="sm" className="rounded-xl" onClick={() => toggleActive(qr.id, qr.is_active)}>{qr.is_active ? 'Deactivate' : 'Activate'}</Button>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {/* Enhanced Table View */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-primary/5 to-primary/10 border-b border-gray-100">
+                <tr className="text-sm font-semibold text-foreground">
+                  <th className="text-left p-4 min-w-[200px]">
+                    <div className="flex items-center gap-2">
+                      <QrCode className="w-4 h-4 text-primary" />
+                      QR Code
                     </div>
-                  </td>
+                  </th>
+                  <th className="text-left p-4 min-w-[120px]">
+                    <div className="flex items-center gap-2">
+                      {getQRTypeIcon('static')}
+                      Type
+                    </div>
+                  </th>
+                  <th className="text-left p-4 min-w-[300px]">
+                    <div className="flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4 text-primary" />
+                      Content
+                    </div>
+                  </th>
+                  <th className="text-left p-4 min-w-[120px]">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      Created
+                    </div>
+                  </th>
+                  <th className="text-left p-4 min-w-[100px]">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4 text-primary" />
+                      Scans
+                    </div>
+                  </th>
+                  <th className="text-left p-4 min-w-[100px]">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-primary" />
+                      Status
+                    </div>
+                  </th>
+                  <th className="text-right p-4 min-w-[140px]">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((qr, index) => (
+                  <tr key={qr.id} className={`hover:bg-gray-50/50 transition-colors duration-150 ${
+                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'
+                  }`}>
+                    {/* QR Code & Name */}
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-white rounded-lg border border-gray-200 flex-shrink-0 overflow-hidden">
+                          <QRCodeImage qrId={qr.id} className="w-full h-full" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm truncate" title={qr.title}>
+                            {qr.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground font-mono truncate">
+                            /qr/{qr.id.slice(0, 8)}...
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    
+                    {/* Type */}
+                    <td className="p-4">
+                      <Badge variant="outline" className="text-xs px-2 py-1 rounded-full border-primary/30 text-primary bg-primary/5">
+                        {getQRTypeIcon(qr.qr_type)}
+                        <span className="ml-1 capitalize">{qr.qr_type.replace('-', ' ')}</span>
+                      </Badge>
+                    </td>
+                    
+                    {/* Content */}
+                    <td className="p-4">
+                      <div className="text-sm text-muted-foreground">
+                        <span className="line-clamp-2" title={getQRContent(qr)}>
+                          {getQRContent(qr)}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    {/* Created Date */}
+                    <td className="p-4">
+                      <div className="text-sm text-foreground">
+                        {format(new Date(qr.created_at), 'MMM d, yyyy')}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(qr.created_at), 'h:mm a')}
+                      </div>
+                    </td>
+                    
+                    {/* Scans */}
+                    <td className="p-4">
+                      <div className="flex items-center gap-1">
+                        <BarChart3 className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-sm font-medium text-foreground">{qr.scan_count}</span>
+                      </div>
+                    </td>
+                    
+                    {/* Status */}
+                    <td className="p-4">
+                      <Badge 
+                        variant={qr.is_active ? 'default' : 'secondary'}
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                          qr.is_active 
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {qr.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </td>
+                    
+                    {/* Actions */}
+                    <td className="p-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0 hover:bg-primary/10"
+                          onClick={() => handleEdit(qr)}
+                          title="Edit QR"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0 hover:bg-primary/10"
+                          onClick={() => downloadQRCode(qr.id, qr.title)}
+                          title="Download QR"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0 hover:bg-primary/10"
+                          onClick={() => copyShareLink(qr.id)}
+                          title="Copy Link"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-primary/10">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem onClick={() => toggleActive(qr.id, qr.is_active)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              {qr.is_active ? 'Deactivate' : 'Activate'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => deleteQRCode(qr.id)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Table Footer */}
+          <div className="bg-gray-50/50 px-4 py-3 border-t border-gray-100">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Showing {filtered.length} QR codes</span>
+              <div className="flex items-center gap-4">
+                <span>Total scans: {filtered.reduce((sum, qr) => sum + qr.scan_count, 0)}</span>
+                <span>Active: {filtered.filter(qr => qr.is_active).length}</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

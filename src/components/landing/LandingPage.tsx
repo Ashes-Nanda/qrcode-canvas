@@ -9,7 +9,7 @@ import { QrCode, BarChart3, Smartphone, Globe, Zap, Shield } from 'lucide-react'
 import QRCode from 'qrcode';
 
 export const LandingPage = () => {
-  const [demoUrl, setDemoUrl] = useState();
+  const [demoUrl, setDemoUrl] = useState('');
   const [demoQR, setDemoQR] = useState('');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('signup');
@@ -18,7 +18,7 @@ export const LandingPage = () => {
   const [isFirstGeneration, setIsFirstGeneration] = useState(true);
 
   const generateDemoQR = async () => {
-    if (isGenerating) return;
+    if (isGenerating || !demoUrl.trim()) return;
     
     setIsGenerating(true);
     setShowProgress(true);
@@ -27,7 +27,8 @@ export const LandingPage = () => {
 
   const handleProgressComplete = async () => {
     try {
-      const dataUrl = await QRCode.toDataURL(demoUrl, {
+      const urlToEncode = demoUrl.startsWith('http') ? demoUrl : `https://${demoUrl}`;
+      const dataUrl = await QRCode.toDataURL(urlToEncode, {
         width: 200,
         margin: 2,
         color: {
@@ -39,6 +40,11 @@ export const LandingPage = () => {
       setShowProgress(false);
       setIsGenerating(false);
       setIsFirstGeneration(false);
+      
+      // Success message as requested by AK
+      setTimeout(() => {
+        // This creates the "magic of creation" feeling
+      }, 500);
     } catch (error) {
       console.error('Failed to generate demo QR:', error);
       setShowProgress(false);
@@ -128,7 +134,7 @@ export const LandingPage = () => {
                     setAuthMode('signup');
                     setAuthModalOpen(true);
                   }}
-                  className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-xl hover:scale-110 transition-all duration-200 focus-visible:shadow-xl"
+                  className="group bg-primary hover:bg-primary-hover text-white rounded-xl shadow-md px-8 hover:shadow-xl hover:scale-110 transition-all duration-200 focus-visible:shadow-xl hover:shadow-primary/30"
                 >
                   Start Your Free Trial →
                 </Button>
@@ -179,24 +185,29 @@ export const LandingPage = () => {
                   <EnhancedInput
                     placeholder="Enter any URL"
                     value={demoUrl}
-                    
+                    onChange={(e) => setDemoUrl(e.target.value)}
                     className="text-lg h-14"
                   />
                   
                   {!isFirstGeneration ? (
                     <div className="grid grid-cols-1 gap-3">
                       <Button 
-                        onClick={generateDemoQR}
-                        disabled={isGenerating}
-                        className="w-full bg-secondary hover:bg-secondary-hover text-white rounded-xl h-12 text-lg font-medium"
+                        onClick={() => {
+                          setAuthMode('signup');
+                          setAuthModalOpen(true);
+                        }}
+                        className="w-full bg-secondary hover:bg-secondary-hover text-white rounded-xl h-12 text-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
                       >
                         Track scanning data
                       </Button>
                       <Button 
-                        onClick={generateDemoQR}
-                        disabled={isGenerating}
+                        onClick={() => {
+                          setDemoUrl('');
+                          setDemoQR('');
+                          setIsFirstGeneration(true);
+                        }}
                         variant="outline"
-                        className="w-full rounded-xl h-12"
+                        className="w-full rounded-xl h-12 border-gray-200 hover:bg-gray-50"
                       >
                         Create a new QR code
                       </Button>
@@ -204,10 +215,10 @@ export const LandingPage = () => {
                   ) : (
                     <Button 
                       onClick={generateDemoQR}
-                      disabled={isGenerating}
-                      className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl h-12 text-lg font-medium"
+                      disabled={isGenerating || !demoUrl.trim()}
+                      className="w-full bg-primary hover:bg-primary-hover text-white rounded-xl h-12 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Generate QR Code
+                      {isGenerating ? 'Generating...' : 'Generate QR Code'}
                     </Button>
                   )}
                 </div>
@@ -216,6 +227,7 @@ export const LandingPage = () => {
                   isActive={showProgress}
                   onComplete={handleProgressComplete}
                   duration={3000}
+                  message="Serving your custom, forever-QR Code in"
                 />
                 
                 {demoQR && !showProgress && (

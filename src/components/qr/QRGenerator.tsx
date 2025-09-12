@@ -9,9 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { ProgressCountdown } from '@/components/ui/progress-countdown';
-import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin, UploadCloud, Palette, FileDown } from 'lucide-react';
+import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin, UploadCloud, Palette, FileDown, Upload } from 'lucide-react';
 
 interface MultiUrl {
   url: string;
@@ -74,6 +75,9 @@ export const QRGenerator = () => {
   const [lightColor, setLightColor] = useState<string>('#FFFFFF');
   const [palette, setPalette] = useState<string[]>([]);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [logoSize, setLogoSize] = useState(15);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
 
@@ -208,7 +212,9 @@ export const QRGenerator = () => {
     // Defer actual QR rendering until progress completes
     const performGeneration = async () => {
       try {
-        const dataUrl = await QRCode.toDataURL(qrUrl, {
+        // Generate QR code with canvas for logo support
+        const canvas = document.createElement('canvas');
+        await QRCode.toCanvas(canvas, qrUrl, {
           width: 400,
           margin: 2,
           color: {
@@ -216,6 +222,13 @@ export const QRGenerator = () => {
             light: lightColor
           }
         });
+
+        // If logo is present, overlay it
+        if (logoDataUrl) {
+          await overlayLogo(canvas);
+        }
+
+        const dataUrl = canvas.toDataURL();
         setQrCodeDataUrl(dataUrl);
         if (!hasGeneratedOnce) {
           toast({
@@ -247,6 +260,127 @@ export const QRGenerator = () => {
 
   // Holds the pending generation callback until progress completes
   const pendingGenerationRef = useRef<null | (() => Promise<void>)>(null);
+
+  // Logo overlay function
+  const overlayLogo = async (canvas: HTMLCanvasElement): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx || !logoDataUrl) {
+        resolve();
+        return;
+      }
+
+      // Enable high-quality image rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      const logo = new Image();
+      logo.onload = async () => {
+        try {
+          const canvasSize = canvas.width;
+          const logoSizePixels = (canvasSize * logoSize) / 100;
+          
+          // Calculate position (center)
+          const x = (canvasSize - logoSizePixels) / 2;
+          const y = (canvasSize - logoSizePixels) / 2;
+          
+          // Create enhanced background with better anti-aliasing
+          const padding = logoSizePixels * 0.15; // Slightly more padding
+          const bgRadius = (logoSizePixels + padding) / 2;
+          
+          // Save the current state
+          ctx.save();
+          
+          // Create a high-quality circular background
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = lightColor;
+          ctx.beginPath();
+          ctx.arc(canvasSize / 2, canvasSize / 2, bgRadius, 0, 2 * Math.PI);
+          ctx.fill();
+          
+          // Add subtle shadow for depth
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 2;
+          
+          // Create clipping mask for logo (circular)
+          ctx.beginPath();
+          const logoRadius = logoSizePixels / 2 - 2; // Slight inset from background
+          ctx.arc(canvasSize / 2, canvasSize / 2, logoRadius, 0, 2 * Math.PI);
+          ctx.clip();
+          
+          // Reset shadow for logo
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw the logo with high quality
+          const logoX = x + 2; // Slight inset
+          const logoY = y + 2;
+          const logoSizeFinal = logoSizePixels - 4;
+          
+          ctx.drawImage(logo, logoX, logoY, logoSizeFinal, logoSizeFinal);
+          
+          // Restore the context
+          ctx.restore();
+          
+          // Add subtle border around the logo background
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(canvasSize / 2, canvasSize / 2, bgRadius, 0, 2 * Math.PI);
+          ctx.stroke();
+          
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      logo.onerror = () => reject(new Error('Failed to load logo'));
+      logo.crossOrigin = 'anonymous'; // Handle CORS issues
+      logo.src = logoDataUrl;
+    });
+  };
+
+  // Logo upload handler
+  const handleLogoUpload = (file: File) => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file",
+        description: "Please upload an image file (PNG, JPG, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setLogoFile(file);
+      setLogoDataUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Remove logo
+  const removeLogo = () => {
+    setLogoFile(null);
+    setLogoDataUrl('');
+  };
 
   // Image upload & palette extraction
   const handleImageUpload = (file: File) => {
@@ -412,6 +546,15 @@ export const QRGenerator = () => {
           break;
       }
 
+      // Add design options to qrData
+      qrData.design_options = {
+        foregroundColor: darkColor,
+        backgroundColor: lightColor,
+        logoSize: logoSize,
+        hasLogo: !!logoDataUrl,
+        logoDataUrl: logoDataUrl
+      };
+
       const { data: savedQR, error } = await supabase
         .from('qr_codes')
         .insert(qrData)
@@ -423,7 +566,10 @@ export const QRGenerator = () => {
       // Update the QR code with the actual redirect URL
       if (qrType !== 'static' && qrType !== 'vcard' && qrType !== 'text' && qrType !== 'event') {
         const actualUrl = `${window.location.origin}/qr/${savedQR.id}`;
-        const updatedDataUrl = await QRCode.toDataURL(actualUrl, {
+        
+        // Generate with logo support
+        const canvas = document.createElement('canvas');
+        await QRCode.toCanvas(canvas, actualUrl, {
           width: 400,
           margin: 2,
           color: {
@@ -431,6 +577,13 @@ export const QRGenerator = () => {
             light: lightColor
           }
         });
+        
+        // If logo is present, overlay it
+        if (logoDataUrl) {
+          await overlayLogo(canvas);
+        }
+        
+        const updatedDataUrl = canvas.toDataURL();
         setQrCodeDataUrl(updatedDataUrl);
       }
 
@@ -509,6 +662,10 @@ export const QRGenerator = () => {
     setTextContent('');
     setEventData({});
     setQrCodeDataUrl('');
+    setLogoFile(null);
+    setLogoDataUrl('');
+    setLogoSize(15);
+    setPalette([]);
   };
 
   const addMultiUrl = () => {
@@ -650,6 +807,85 @@ export const QRGenerator = () => {
                 {palette.map((c, i) => (
                   <button key={i} type="button" aria-label={`Pick color ${c}`} className="h-7 w-7 rounded-md border" style={{ backgroundColor: c }} onClick={() => setDarkColor(c)} />
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Logo Upload & Embedding */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Upload className="h-4 w-4" /> 
+              Logo & Branding
+            </Label>
+            
+            {!logoDataUrl ? (
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center bg-gray-50">
+                <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-600 mb-2">
+                  Add your logo to QR code
+                </p>
+                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer hover:bg-accent/10 bg-white">
+                  <span className="text-sm">Choose Image</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleLogoUpload(f);
+                    }}
+                  />
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  PNG, JPG up to 5MB
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-white">
+                  <img
+                    src={logoDataUrl}
+                    alt="Logo preview"
+                    className="w-10 h-10 object-cover rounded-lg border border-gray-100"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">Logo uploaded</p>
+                    <p className="text-xs text-gray-500">
+                      {logoFile?.name}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeLogo}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    Remove
+                  </Button>
+                </div>
+
+                {/* Logo Size Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Logo Size</Label>
+                    <span className="text-sm text-gray-500">
+                      {logoSize}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[logoSize]}
+                    onValueChange={(value) => setLogoSize(value[0])}
+                    max={30}
+                    min={5}
+                    step={1}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>5%</span>
+                    <span>30%</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>

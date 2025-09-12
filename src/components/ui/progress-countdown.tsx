@@ -61,12 +61,13 @@ export const ProgressCountdown: React.FC<ProgressCountdownProps> = ({
   if (!isActive) return null;
 
   return (
-    <div className="space-y-4 p-6 bg-success rounded-xl border border-primary/20">
-      <div className="text-center space-y-2">
-        <p className="text-success-foreground font-medium">
-          {message} <span className="text-2xl font-bold text-primary">{countdown}</span>
+    <div className="space-y-4 p-6 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-xl border border-primary/20">
+      <div className="text-center space-y-3">
+        <p className="text-foreground font-medium text-lg">
+          {message} <span className="text-3xl font-bold text-primary animate-pulse">{countdown}</span>
         </p>
-        <Progress value={progress} className="h-3" />
+        <Progress value={progress} className="h-4" />
+        <p className="text-sm text-muted-foreground">Creating your forever-QR code...</p>
       </div>
     </div>
   );

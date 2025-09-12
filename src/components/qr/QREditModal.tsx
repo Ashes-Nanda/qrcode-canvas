@@ -8,7 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import QRCode from 'qrcode';
-import { Loader2, Upload, Palette, Download, Save, RotateCcw } from 'lucide-react';
+import { Loader2, Upload, Palette, Download, Save, RotateCcw, Circle, Square } from 'lucide-react';
 
 interface QREditModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ interface QRDesignOptions {
   logoFile: File | null;
   logoDataUrl: string;
   logoSize: number; // 0-30 (percentage of QR size)
+  logoShape: 'circle' | 'rounded-square';
 }
 
 export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalProps) => {
@@ -35,6 +36,7 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
     logoFile: null,
     logoDataUrl: '',
     logoSize: 15,
+    logoShape: 'circle',
   });
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -113,8 +115,12 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
         return;
       }
 
+      // Enable high-quality image rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
       const logo = new Image();
-      logo.onload = () => {
+      logo.onload = async () => {
         try {
           const canvasSize = canvas.width;
           const logoSizePixels = (canvasSize * designOptions.logoSize) / 100;
@@ -123,21 +129,66 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
           const x = (canvasSize - logoSizePixels) / 2;
           const y = (canvasSize - logoSizePixels) / 2;
           
-          // Create a white background circle for the logo
-          const padding = logoSizePixels * 0.1;
+          // Create enhanced background with better anti-aliasing
+          const padding = logoSizePixels * 0.15; // Slightly more padding
+          const bgRadius = (logoSizePixels + padding) / 2;
+          
+          // Save the current state
+          ctx.save();
+          
+          // Create a high-quality circular background
+          ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = designOptions.backgroundColor;
           ctx.beginPath();
-          ctx.arc(
-            canvasSize / 2, 
-            canvasSize / 2, 
-            (logoSizePixels + padding) / 2, 
-            0, 
-            2 * Math.PI
-          );
+          ctx.arc(canvasSize / 2, canvasSize / 2, bgRadius, 0, 2 * Math.PI);
           ctx.fill();
           
-          // Draw the logo
-          ctx.drawImage(logo, x, y, logoSizePixels, logoSizePixels);
+          // Add subtle shadow for depth
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 2;
+          
+          // Create clipping mask for logo (circular or rounded square)
+          ctx.beginPath();
+          const logoRadius = logoSizePixels / 2 - 2; // Slight inset from background
+          
+          if (designOptions.logoShape === 'circle') {
+            ctx.arc(canvasSize / 2, canvasSize / 2, logoRadius, 0, 2 * Math.PI);
+          } else {
+            // Rounded square
+            const cornerRadius = logoRadius * 0.2;
+            const logoX = x + 2;
+            const logoY = y + 2;
+            const logoSize = logoSizePixels - 4;
+            
+            ctx.roundRect(logoX, logoY, logoSize, logoSize, cornerRadius);
+          }
+          ctx.clip();
+          
+          // Reset shadow for logo
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Draw the logo with high quality
+          const logoX = x + 2; // Slight inset
+          const logoY = y + 2;
+          const logoSize = logoSizePixels - 4;
+          
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+          
+          // Restore the context
+          ctx.restore();
+          
+          // Add subtle border around the logo background
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(canvasSize / 2, canvasSize / 2, bgRadius, 0, 2 * Math.PI);
+          ctx.stroke();
+          
           resolve();
         } catch (error) {
           reject(error);
@@ -145,6 +196,7 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
       };
       
       logo.onerror = () => reject(new Error('Failed to load logo'));
+      logo.crossOrigin = 'anonymous'; // Handle CORS issues
       logo.src = designOptions.logoDataUrl;
     });
   };
@@ -203,32 +255,125 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
       logoFile: null,
       logoDataUrl: '',
       logoSize: 15,
+      logoShape: 'circle',
     });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const downloadQR = () => {
-    if (!qrCodeDataUrl) return;
+  const downloadQR = async (format: 'png' | 'svg' = 'png', quality: 'standard' | 'high' = 'high') => {
+    if (!qrCodeDataUrl && format === 'png') return;
     
-    fetch(qrCodeDataUrl)
-      .then(res => res.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_qr.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        toast({
-          title: "Downloaded!",
-          description: "QR code has been downloaded successfully.",
-        });
+    try {
+      let filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_qr`;
+      
+      if (format === 'svg') {
+        // Generate high-quality SVG
+        await downloadSVG();
+        return;
+      }
+      
+      // PNG Download with quality options
+      const canvas = document.createElement('canvas');
+      const size = quality === 'high' ? 800 : 400; // High quality = 800px
+      canvas.width = size;
+      canvas.height = size;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      // Enable high-quality rendering
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Determine QR URL
+      let qrUrl = '';
+      if (qrCode.qr_type === 'static') {
+        qrUrl = destinationUrl || qrCode.destination_url || '';
+      } else {
+        qrUrl = `${window.location.origin}/qr/${qrCode.id}`;
+      }
+      
+      // Generate base QR code
+      await QRCode.toCanvas(canvas, qrUrl, {
+        width: size,
+        margin: 2,
+        color: {
+          dark: designOptions.foregroundColor,
+          light: designOptions.backgroundColor
+        }
       });
+      
+      // Add logo if present
+      if (designOptions.logoDataUrl) {
+        await overlayLogo(canvas);
+      }
+      
+      // Download
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.download = `${filename}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Downloaded!",
+        description: `High-quality PNG (${size}x${size}px) downloaded successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "There was an error downloading the QR code.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const downloadSVG = async () => {
+    try {
+      // For SVG, we need to create a simpler version without logo embedding
+      // as SVG generation with embedded images is complex
+      let qrUrl = '';
+      if (qrCode.qr_type === 'static') {
+        qrUrl = destinationUrl || qrCode.destination_url || '';
+      } else {
+        qrUrl = `${window.location.origin}/qr/${qrCode.id}`;
+      }
+      
+      const svgString = await QRCode.toString(qrUrl, {
+        type: 'svg',
+        width: 800,
+        margin: 2,
+        color: {
+          dark: designOptions.foregroundColor,
+          light: designOptions.backgroundColor
+        }
+      });
+      
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_qr.svg`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "SVG Downloaded!",
+        description: "Vector SVG file downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "SVG download failed",
+        description: "There was an error generating the SVG file.",
+        variant: "destructive",
+      });
+    }
   };
 
   const saveChanges = async () => {
@@ -505,6 +650,38 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
                         <span>30%</span>
                       </div>
                     </div>
+                    
+                    {/* Logo Shape Selector */}
+                    <div className="space-y-3">
+                      <Label className="text-sm">Logo Shape</Label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDesignOptions(prev => ({ ...prev, logoShape: 'circle' }))}
+                          className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-200 ${
+                            designOptions.logoShape === 'circle'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Circle className="h-4 w-4" />
+                          <span className="text-sm font-medium">Circle</span>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setDesignOptions(prev => ({ ...prev, logoShape: 'rounded-square' }))}
+                          className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-200 ${
+                            designOptions.logoShape === 'rounded-square'
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Square className="h-4 w-4" />
+                          <span className="text-sm font-medium">Rounded</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -528,15 +705,26 @@ export const QREditModal = ({ isOpen, onClose, qrCode, onUpdate }: QREditModalPr
                     className="mx-auto rounded-xl shadow-md border border-gray-100"
                     style={{ maxWidth: '300px', width: '100%' }}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={downloadQR}
-                    className="rounded-xl border-gray-200 hover:bg-gray-50"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Preview
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => downloadQR('png', 'high')}
+                      className="flex-1 rounded-xl border-gray-200 hover:bg-gray-50"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      PNG (High-Res)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => downloadQR('svg')}
+                      className="flex-1 rounded-xl border-secondary/30 text-secondary hover:bg-secondary/10 hover:border-secondary"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      SVG Vector
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-64 text-gray-500">
