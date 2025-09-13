@@ -31,7 +31,11 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ['react', 'react-dom'], // Prevent multiple React instances
+    dedupe: ['react', 'react-dom', 'react-router-dom'], // Prevent multiple React instances
+  },
+  define: {
+    // Ensure React is available globally
+    global: 'globalThis',
   },
   build: {
     // Performance optimizations
@@ -54,59 +58,20 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
           output: {
             // Better manual chunking for optimal loading
-            manualChunks: (id) => {
-          // Vendor chunks
-          if (id.includes('node_modules')) {
-            // Keep React and React-DOM together to prevent context issues
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            if (id.includes('@tanstack/react-query')) {
-              return 'query-vendor';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'radix-vendor';
-            }
-            if (id.includes('@supabase')) {
-              return 'supabase-vendor';
-            }
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-            if (id.includes('qrcode')) {
-              return 'qrcode-vendor';
-            }
-            if (id.includes('canvas')) {
-              return 'canvas-vendor';
-            }
-            if (id.includes('jspdf')) {
-              return 'pdf-vendor';
-            }
-            if (id.includes('file-saver') || id.includes('html2canvas')) {
-              return 'file-vendor';
-            }
-            if (id.includes('date-fns') || id.includes('clsx') || id.includes('class-variance-authority')) {
-              return 'ui-utils-vendor';
-            }
-            // Other node_modules
-            return 'vendor';
-          }
-          // Application chunks
-          if (id.includes('/components/qr/')) {
-            return 'qr-components';
-          }
-          if (id.includes('/components/analytics/')) {
-            return 'analytics';
-          }
-          if (id.includes('/components/auth/')) {
-            return 'auth';
-          }
-          if (id.includes('/components/dashboard/')) {
-            return 'dashboard';
-          }
-          if (id.includes('/components/ui/')) {
-            return 'ui-components';
-          }
+        manualChunks: {
+          // Keep ALL React-related code together
+          'react-vendor': [
+            'react', 
+            'react-dom', 
+            'react-dom/client',
+            'react-router-dom',
+            'react/jsx-runtime'
+          ],
+          // Separate other major vendors
+          'ui-vendor': ['@radix-ui/react-slot', '@radix-ui/react-toast'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+          'query-vendor': ['@tanstack/react-query'],
+          'qr-vendor': ['qrcode'],
         },
         // Better file names for caching
         chunkFileNames: (chunkInfo) => {
@@ -139,12 +104,17 @@ export default defineConfig(({ mode }) => ({
     include: [
       'react',
       'react-dom',
+      'react-dom/client',
       'react-router-dom',
       '@tanstack/react-query',
       'lucide-react',
       'qrcode',
-      '@supabase/supabase-js', // Include for proper module resolution
+      '@supabase/supabase-js',
+      // Include all React ecosystem packages to ensure proper bundling
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime'
     ],
-    exclude: ['canvas'], // Exclude problematic Node.js modules
+    exclude: ['canvas', 'fs', 'path'], // Exclude all Node.js modules
+    force: true // Force re-bundling on next dev
   },
 }));

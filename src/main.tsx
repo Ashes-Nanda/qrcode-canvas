@@ -1,3 +1,6 @@
+// Import React polyfill FIRST to ensure createContext is available
+import './lib/react-polyfill';
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
