@@ -31,6 +31,7 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ['react', 'react-dom'], // Prevent multiple React instances
   },
   build: {
     // Performance optimizations
@@ -51,16 +52,17 @@ export default defineConfig(({ mode }) => ({
       },
     },
     rollupOptions: {
-      output: {
-        // Better manual chunking for optimal loading
-        manualChunks: (id) => {
+          output: {
+            // Better manual chunking for optimal loading
+            manualChunks: (id) => {
           // Vendor chunks
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
+            // Keep React and React-DOM together to prevent context issues
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
               return 'react-vendor';
             }
-            if (id.includes('react-router') || id.includes('@tanstack/react-query')) {
-              return 'router-vendor';
+            if (id.includes('@tanstack/react-query')) {
+              return 'query-vendor';
             }
             if (id.includes('@radix-ui')) {
               return 'radix-vendor';
@@ -143,5 +145,6 @@ export default defineConfig(({ mode }) => ({
       'qrcode',
       '@supabase/supabase-js', // Include for proper module resolution
     ],
+    exclude: ['canvas'], // Exclude problematic Node.js modules
   },
 }));
