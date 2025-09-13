@@ -40,22 +40,50 @@ export const Analytics = () => {
   }, [timeRange, reportingFrequency]);
 
   const fetchAnalytics = async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No authenticated user found for analytics');
+        return;
+      }
+
+      console.log('Fetching analytics for user:', user.id);
 
       // Calculate date range
       const daysBack = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - daysBack);
+      
+      console.log('Date range:', { startDate, daysBack });
 
-      // Fetch QR codes stats
-      const { data: qrData, error: qrError } = await supabase
-        .from('qr_codes')
-        .select('id, title, scan_count, is_active, qr_type, form_data, content_preview')
-        .eq('user_id', user.id);
+      // Fetch QR codes stats with graceful column handling
+      let qrData, qrError;
+      try {
+        // Try with all columns first (after database migration)
+        const result = await supabase
+          .from('qr_codes')
+          .select('id, title, scan_count, is_active, qr_type, form_data, content_preview')
+          .eq('user_id', user.id);
+        qrData = result.data;
+        qrError = result.error;
+      } catch (error) {
+        console.log('Full column query failed, trying basic columns:', error);
+        // Fallback to basic columns if the above fails
+        const result = await supabase
+          .from('qr_codes')
+          .select('id, title, scan_count, is_active, qr_type')
+          .eq('user_id', user.id);
+        qrData = result.data;
+        qrError = result.error;
+      }
 
-      if (qrError) throw qrError;
+      if (qrError) {
+        console.error('Error fetching QR codes for analytics:', qrError);
+        throw qrError;
+      }
+      
+      console.log('QR codes found for analytics:', qrData?.length || 0);
 
       const totalQRs = qrData?.length || 0;
       const activeQRs = qrData?.filter(qr => qr.is_active)?.length || 0;
@@ -63,26 +91,40 @@ export const Analytics = () => {
 
       // Fetch scan logs for detailed analytics
       const qrIds = qrData?.map(qr => qr.id) || [];
+      console.log('QR IDs for scan logs:', qrIds.length);
       
       let scanLogs = [];
       if (qrIds.length > 0) {
-        const { data: scanData, error: scanError } = await supabase
-          .from('qr_scan_logs')
-          .select('*')
-          .in('qr_code_id', qrIds)
-          .gte('scanned_at', startDate.toISOString());
+        try {
+          const { data: scanData, error: scanError } = await supabase
+            .from('qr_scan_logs')
+            .select('*')
+            .in('qr_code_id', qrIds)
+            .gte('scanned_at', startDate.toISOString());
 
-        if (scanError) throw scanError;
-        scanLogs = scanData || [];
+          if (scanError) {
+            console.error('Error fetching scan logs:', scanError);
+            // Don't throw here - continue with empty scan logs
+            scanLogs = [];
+          } else {
+            scanLogs = scanData || [];
+            console.log('Scan logs found:', scanLogs.length);
+          }
+        } catch (error) {
+          console.error('Exception fetching scan logs:', error);
+          scanLogs = [];
+        }
       }
 
       const recentScans = scanLogs.length;
 
-      // Calculate average latency
-      const latencies = scanLogs.filter(log => log.scan_latency).map(log => log.scan_latency);
+      // Calculate average latency (handle missing scan_latency column gracefully)
+      const latencies = scanLogs.filter(log => log.scan_latency && typeof log.scan_latency === 'number').map(log => log.scan_latency);
       const averageLatency = latencies.length > 0 
         ? Math.round(latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length)
         : 0;
+      
+      console.log('Analytics calculated:', { totalQRs: qrData?.length || 0, recentScans, averageLatency });
 
       // Process scans by time period
       const scansByDay = processScansByTimePeriod(scanLogs, daysBack, reportingFrequency);
@@ -115,10 +157,24 @@ export const Analytics = () => {
         topQRs,
       });
     } catch (error: any) {
+      console.error('Analytics error:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch analytics",
+        description: `Failed to fetch analytics: ${error.message || 'Unknown error'}`,
         variant: "destructive",
+      });
+      
+      // Set default analytics data on error
+      setAnalytics({
+        totalQRs: 0,
+        totalScans: 0,
+        activeQRs: 0,
+        recentScans: 0,
+        averageLatency: 0,
+        scansByDay: [],
+        scansByDevice: [],
+        scansByCountry: [],
+        topQRs: [],
       });
     } finally {
       setLoading(false);

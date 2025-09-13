@@ -241,7 +241,10 @@ export const QrPreview: React.FC<QrPreviewProps> = ({
   };
 
   const saveQr = async () => {
-    if (!qrDataUrl) return;
+    if (!qrDataUrl) {
+      console.error('No QR data URL available for saving');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -251,6 +254,7 @@ export const QrPreview: React.FC<QrPreviewProps> = ({
       }
 
       const qrContent = generateQrContent();
+      console.log('Saving QR with content:', qrContent.substring(0, 100) + '...');
       
       // Generate a title based on QR type if not provided
       const title = formData.title || 
@@ -262,6 +266,14 @@ export const QrPreview: React.FC<QrPreviewProps> = ({
          qrType === 'location' ? `Location - ${formData.placeName || 'GPS Coordinates'}` :
          `${qrType.charAt(0).toUpperCase() + qrType.slice(1)} QR Code`);
 
+      console.log('Attempting to save QR with data:', {
+        user_id: user.id,
+        title: title.substring(0, 100),
+        qr_type: qrType,
+        has_form_data: !!formData,
+        has_qr_image: !!qrDataUrl
+      });
+      
       const { data, error } = await supabase
         .from('qr_codes')
         .insert({
@@ -284,8 +296,12 @@ export const QrPreview: React.FC<QrPreviewProps> = ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error saving QR:', error);
+        throw error;
+      }
 
+      console.log('✓ QR code saved successfully:', data.id);
       setSavedQrId(data.id);
       toast({
         title: "Success!",

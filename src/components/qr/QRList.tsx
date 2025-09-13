@@ -105,21 +105,31 @@ const QRListComponent = () => {
   const fetchQRCodes = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No authenticated user found');
+        return;
+      }
 
+      console.log('Fetching QR codes for user:', user.id);
+      
       const { data, error } = await supabase
         .from('qr_codes')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error fetching QR codes:', error);
+        throw error;
+      }
 
+      console.log('Fetched QR codes:', data?.length || 0, 'codes');
       setQrCodes(data || []);
     } catch (error: any) {
+      console.error('Error in fetchQRCodes:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch QR codes",
+        description: `Failed to fetch QR codes: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
