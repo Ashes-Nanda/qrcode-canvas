@@ -603,4 +603,22 @@ All colors MUST be HSL.
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
+
+  /* Force solid background for welcome toast */
+  [data-radix-toast-root] {
+    background: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgb(255 255 255) !important;
+  }
+
+  /* Dark mode solid background */
+  .dark [data-radix-toast-root] {
+    background-color: rgb(15 23 42) !important;
+    border-color: rgb(71 85 105) !important;
+    color: rgb(248 250 252) !important;
+  }
 }
