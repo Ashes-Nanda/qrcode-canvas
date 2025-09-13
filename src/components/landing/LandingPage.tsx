@@ -186,6 +186,12 @@ export const LandingPage = () => {
                     placeholder="Enter any URL"
                     value={demoUrl}
                     onChange={(e) => setDemoUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        generateDemoQR();
+                      }
+                    }}
                     className="text-lg h-14"
                   />
                   
