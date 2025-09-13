@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
-import { ProgressCountdown } from '@/components/ui/progress-countdown';
 import { Download, Loader2, QrCode, Save, Plus, Trash2, MapPin, UploadCloud, Palette, FileDown, Upload, FileText } from 'lucide-react';
+import { RuleBuilder } from './RuleBuilder';
+import { ActionBuilder } from './ActionBuilder';
 
 interface MultiUrl {
   url: string;
@@ -21,56 +22,97 @@ interface MultiUrl {
   label: string;
 }
 
-interface ActionData {
-  email?: string;
-  subject?: string;
-  body?: string;
-  phone?: string;
-  message?: string;
-}
-
-interface VCardData {
+interface ContactData {
   firstName?: string;
   lastName?: string;
-  organization?: string;
-  title?: string;
   phone?: string;
   email?: string;
+  company?: string;
+  jobTitle?: string;
   website?: string;
   address?: string;
 }
 
-interface EventData {
-  title?: string;
-  description?: string;
-  location?: string;
-  startDate?: string;
-  endDate?: string;
-  allDay?: boolean;
+interface SocialsData {
+  platform?: string;
+  username?: string;
+  profileUrl?: string;
 }
 
-interface GeoData {
+interface AppData {
+  iosUrl?: string;
+  androidUrl?: string;
+}
+
+interface LocationData {
   latitude?: number;
   longitude?: number;
-  address?: string;
+  placeName?: string;
+}
+
+interface SMSData {
+  phone?: string;
+  message?: string;
+}
+
+interface EmailData {
+  email?: string;
+  subject?: string;
+  body?: string;
+}
+
+interface PhoneData {
+  phone?: string;
+}
+
+interface QRRule {
+  id?: string;
+  conditionType: 'time' | 'day' | 'device';
+  conditionValue: any;
+  redirectUrl: string;
+  priority: number;
+}
+
+interface QRAction {
+  id?: string;
+  actionType: 'call' | 'website' | 'whatsapp' | 'directions' | 'vcard';
+  actionData: any;
+  displayOrder: number;
+}
+
+interface BrandColors {
+  primary?: string;
+  secondary?: string;
+  accent?: string;
+  background?: string;
 }
 
 export const QRGenerator = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [qrType, setQrType] = useState<'static' | 'dynamic' | 'multi-url' | 'action' | 'geo' | 'vcard' | 'text' | 'event'>('static');
-  const [destinationUrl, setDestinationUrl] = useState('');
+  const [qrType] = useState<'url'>('url'); // MVP: Default to URL only
+  const [url, setUrl] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [multiUrls, setMultiUrls] = useState<MultiUrl[]>([{ url: '', weight: 1, label: '' }]);
-  const [actionType, setActionType] = useState<'email' | 'phone' | 'sms'>('email');
-  const [actionData, setActionData] = useState<ActionData>({});
-  const [geoData, setGeoData] = useState<GeoData>({});
-  const [vCardData, setVCardData] = useState<VCardData>({});
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [contactData, setContactData] = useState<ContactData>({});
+  const [socialsData, setSocialsData] = useState<SocialsData>({});
   const [textContent, setTextContent] = useState('');
-  const [eventData, setEventData] = useState<EventData>({});
+  const [appData, setAppData] = useState<AppData>({});
+  const [locationData, setLocationData] = useState<LocationData>({});
+  const [smsData, setSmsData] = useState<SMSData>({});
+  const [emailData, setEmailData] = useState<EmailData>({});
+  const [phoneData, setPhoneData] = useState<PhoneData>({});
+  const [qrRules, setQrRules] = useState<QRRule[]>([]);
+  const [qrActions, setQrActions] = useState<QRAction[]>([]);
+  const [brandColors, setBrandColors] = useState<BrandColors>({});
+  const [extractedColors, setExtractedColors] = useState<string[]>([]);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showProgress, setShowProgress] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showCustomizeDesign, setShowCustomizeDesign] = useState(false);
+  const [autoPreview, setAutoPreview] = useState('');
   const [hasGeneratedOnce, setHasGeneratedOnce] = useState(false);
   const [darkColor, setDarkColor] = useState<string>('#2e266d');
   const [lightColor, setLightColor] = useState<string>('#FFFFFF');
@@ -117,22 +159,11 @@ export const QRGenerator = () => {
     let qrUrl = '';
     
     switch (qrType) {
-      case 'static':
-      case 'dynamic':
-        if (!destinationUrl.trim()) {
+      case 'url':
+        if (!url.trim()) {
           toast({
             title: "⚠️ URL Required",
-            description: "Please enter a destination URL for your QR code.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // Check URL length
-        if (destinationUrl.length > 2000) {
-          toast({
-            title: "⚠️ URL Too Long",
-            description: `URL must be 2000 characters or less. Current length: ${destinationUrl.length}`,
+            description: "Please enter a URL for your QR code.",
             variant: "destructive",
           });
           return;
@@ -142,11 +173,11 @@ export const QRGenerator = () => {
         let validUrl;
         try {
           // Try to parse as-is first
-          validUrl = new URL(destinationUrl);
+          validUrl = new URL(url);
         } catch {
           try {
             // Try with https:// prefix
-            validUrl = new URL('https://' + destinationUrl);
+            validUrl = new URL('https://' + url);
           } catch {
             toast({
               title: "⚠️ Invalid URL Format",
@@ -157,70 +188,52 @@ export const QRGenerator = () => {
           }
         }
         
-        // Check protocol
-        if (!['http:', 'https:', 'ftp:', 'mailto:', 'tel:'].includes(validUrl.protocol)) {
+        qrUrl = validUrl.toString();
+        break;
+        
+      case 'pdf':
+        if (!pdfFile) {
           toast({
-            title: "⚠️ Unsupported URL Protocol",
-            description: `Only HTTP, HTTPS, FTP, Email (mailto:), and Phone (tel:) URLs are supported. Found: ${validUrl.protocol}`,
+            title: "⚠️ PDF File Required",
+            description: "Please upload a PDF file.",
             variant: "destructive",
           });
           return;
         }
         
-        // Check for suspicious URLs
-        const suspiciousDomains = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.', '10.0.', '172.16.'];
-        if (suspiciousDomains.some(domain => validUrl.hostname.includes(domain))) {
+        if (pdfFile.size > 10 * 1024 * 1024) { // 10MB limit
           toast({
-            title: "⚠️ Local URL Detected",
-            description: "Local URLs (localhost, private IPs) may not work when shared publicly.",
+            title: "⚠️ File Too Large",
+            description: "PDF file must be smaller than 10MB.",
             variant: "destructive",
           });
           return;
         }
         
-        // Use the properly formatted URL
-        const finalUrl = validUrl.toString();
-        qrUrl = qrType === 'dynamic' ? `${window.location.origin}/qr/PLACEHOLDER` : finalUrl;
+        // This will be a placeholder for now - file upload logic will be handled separately
+        qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
         break;
         
       case 'multi-url':
-        if (multiUrls.length === 0) {
+        const validUrls = multiUrls.filter(item => item.url.trim());
+        if (validUrls.length === 0) {
           toast({
             title: "⚠️ No URLs Configured",
-            description: "Please add at least one URL for your multi-URL QR code.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        const emptyUrls = multiUrls.filter(url => !url.url.trim());
-        if (emptyUrls.length > 0) {
-          toast({
-            title: "⚠️ Empty URLs Found",
-            description: `Please fill in all URL fields or remove empty ones. Found ${emptyUrls.length} empty URL(s).`,
+            description: "Please add at least one URL.",
             variant: "destructive",
           });
           return;
         }
         
         // Validate each URL
-        for (let i = 0; i < multiUrls.length; i++) {
-          const urlEntry = multiUrls[i];
-          if (urlEntry.url.length > 2000) {
-            toast({
-              title: "⚠️ URL Too Long",
-              description: `URL #${i + 1} is too long (${urlEntry.url.length} characters). Maximum allowed: 2000.`,
-              variant: "destructive",
-            });
-            return;
-          }
-          
+        for (let i = 0; i < validUrls.length; i++) {
+          const urlEntry = validUrls[i];
           try {
             new URL(urlEntry.url.startsWith('http') ? urlEntry.url : 'https://' + urlEntry.url);
           } catch {
             toast({
               title: "⚠️ Invalid URL Format",
-              description: `URL #${i + 1} "${urlEntry.url.substring(0, 50)}..." is not a valid URL.`,
+              description: `URL #${i + 1} is not valid.`,
               variant: "destructive",
             });
             return;
@@ -230,67 +243,104 @@ export const QRGenerator = () => {
         qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
         break;
         
-      case 'action':
-        if (actionType === 'email') {
-          if (!actionData.email?.trim()) {
-            toast({
-              title: "⚠️ Email Required",
-              description: "Please enter an email address for the email action.",
-              variant: "destructive",
-            });
-            return;
-          }
-          
-          // Basic email validation
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(actionData.email)) {
-            toast({
-              title: "⚠️ Invalid Email",
-              description: "Please enter a valid email address (e.g., user@example.com).",
-              variant: "destructive",
-            });
-            return;
-          }
+      case 'file':
+        if (!uploadFile) {
+          toast({
+            title: "⚠️ File Required",
+            description: "Please upload a file.",
+            variant: "destructive",
+          });
+          return;
         }
         
-        if (actionType === 'phone' || actionType === 'sms') {
-          if (!actionData.phone?.trim()) {
-            toast({
-              title: "⚠️ Phone Number Required",
-              description: `Please enter a phone number for the ${actionType} action.`,
-              variant: "destructive",
-            });
-            return;
-          }
-          
-          // Basic phone validation (international format)
-          const phoneRegex = /^[+]?[1-9]\d{1,14}$/;
-          const cleanPhone = actionData.phone.replace(/[\s\-\(\)]/g, '');
-          if (!phoneRegex.test(cleanPhone)) {
-            toast({
-              title: "⚠️ Invalid Phone Number",
-              description: "Please enter a valid phone number (e.g., +1234567890 or 1234567890).",
-              variant: "destructive",
-            });
-            return;
-          }
+        if (uploadFile.size > 25 * 1024 * 1024) { // 25MB limit
+          toast({
+            title: "⚠️ File Too Large",
+            description: "File must be smaller than 25MB.",
+            variant: "destructive",
+          });
+          return;
         }
         
         qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
         break;
         
-      case 'geo':
-        if (geoData.latitude === undefined || geoData.latitude === null || geoData.longitude === undefined || geoData.longitude === null) {
+      case 'contact':
+        if (!contactData.firstName?.trim() || !contactData.lastName?.trim()) {
+          toast({
+            title: "⚠️ Name Required",
+            description: "Please enter both first and last name.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (!contactData.phone?.trim() || !contactData.email?.trim()) {
+          toast({
+            title: "⚠️ Contact Info Required",
+            description: "Please enter both phone number and email.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Generate vCard string
+        qrUrl = generateVCardString(contactData);
+        break;
+        
+      case 'socials':
+        if (!socialsData.platform || !socialsData.username?.trim()) {
+          toast({
+            title: "⚠️ Social Info Required",
+            description: "Please select a platform and enter username.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Generate social media URL
+        qrUrl = generateSocialUrl(socialsData);
+        break;
+        
+      case 'text':
+        if (!textContent.trim()) {
+          toast({
+            title: "⚠️ Text Required",
+            description: "Please enter text content.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        qrUrl = textContent;
+        break;
+        
+      case 'app':
+        if (!appData.iosUrl?.trim() && !appData.androidUrl?.trim()) {
+          toast({
+            title: "⚠️ App URL Required",
+            description: "Please enter at least one app store URL.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Generate smart app URL that detects device
+        qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
+        break;
+        
+      case 'location':
+        if (!locationData.latitude || !locationData.longitude) {
           toast({
             title: "⚠️ Location Required",
-            description: "Please set latitude and longitude coordinates for the geo-location QR code.",
+            description: "Please enter latitude and longitude.",
             variant: "destructive",
           });
           return;
         }
         
         // Validate coordinate ranges
-        if (geoData.latitude < -90 || geoData.latitude > 90) {
+        if (locationData.latitude < -90 || locationData.latitude > 90) {
           toast({
             title: "⚠️ Invalid Latitude",
             description: "Latitude must be between -90 and 90 degrees.",
@@ -299,7 +349,7 @@ export const QRGenerator = () => {
           return;
         }
         
-        if (geoData.longitude < -180 || geoData.longitude > 180) {
+        if (locationData.longitude < -180 || locationData.longitude > 180) {
           toast({
             title: "⚠️ Invalid Longitude",
             description: "Longitude must be between -180 and 180 degrees.",
@@ -308,115 +358,205 @@ export const QRGenerator = () => {
           return;
         }
         
-        qrUrl = `${window.location.origin}/qr/PLACEHOLDER`;
+        // Generate geo URL
+        qrUrl = `geo:${locationData.latitude},${locationData.longitude}${locationData.placeName ? `?q=${encodeURIComponent(locationData.placeName)}` : ''}`;
         break;
         
-      case 'vcard':
-        if (!vCardData.firstName && !vCardData.lastName) {
+      case 'sms':
+        if (!smsData.phone?.trim() || !smsData.message?.trim()) {
           toast({
-            title: "Error",
-            description: "Please enter at least a first or last name",
+            title: "⚠️ SMS Info Required",
+            description: "Please enter both phone number and message.",
             variant: "destructive",
           });
           return;
         }
-        // For vCard, we'll encode directly
-        qrUrl = generateVCardString(vCardData);
+        
+        qrUrl = `sms:${smsData.phone}?body=${encodeURIComponent(smsData.message)}`;
         break;
         
-      case 'text':
-        if (!textContent.trim()) {
+      case 'email':
+        if (!emailData.email?.trim() || !emailData.subject?.trim() || !emailData.body?.trim()) {
           toast({
-            title: "⚠️ Text Required",
-            description: "Please enter some text content for your text QR code.",
+            title: "⚠️ Email Info Required",
+            description: "Please fill in all email fields.",
             variant: "destructive",
           });
           return;
         }
         
-        // Check text length (QR codes have practical limits)
-        if (textContent.length > 2000) {
-          toast({
-            title: "⚠️ Text Too Long",
-            description: `Text content is too long (${textContent.length} characters). Maximum recommended: 2000 characters for optimal scanning.`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // For text, we'll encode directly
-        qrUrl = textContent;
+        qrUrl = `mailto:${emailData.email}?subject=${encodeURIComponent(emailData.subject)}&body=${encodeURIComponent(emailData.body)}`;
         break;
         
-      case 'event':
-        if (!eventData.title || !eventData.startDate) {
+      case 'phone':
+        if (!phoneData.phone?.trim()) {
           toast({
-            title: "Error",
-            description: "Please enter event title and start date",
+            title: "⚠️ Phone Number Required",
+            description: "Please enter a phone number.",
             variant: "destructive",
           });
           return;
         }
-        // For event, we'll encode directly
-        qrUrl = generateEventString(eventData);
+        
+        qrUrl = `tel:${phoneData.phone}`;
+        break;
+      
+      case 'context-aware':
+        if (!url.trim()) {
+          toast({
+            title: "⚠️ Fallback URL Required",
+            description: "Please enter a fallback URL for your context-aware QR code.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (qrRules.length === 0) {
+          toast({
+            title: "⚠️ No Rules Configured",
+            description: "Please add at least one conditional rule.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate each rule
+        for (let i = 0; i < qrRules.length; i++) {
+          const rule = qrRules[i];
+          if (!rule.redirectUrl.trim()) {
+            toast({
+              title: "⚠️ Rule URL Required",
+              description: `Rule #${i + 1} needs a redirect URL.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+        
+        // This will redirect to our edge function which handles the logic
+        qrUrl = `${window.location.origin}/functions/v1/qr-redirect?id=PLACEHOLDER`;
+        break;
+      
+      case 'multi-action':
+        if (qrActions.length === 0) {
+          toast({
+            title: "⚠️ No Actions Configured",
+            description: "Please add at least one action for your multi-action QR code.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate each action
+        for (let i = 0; i < qrActions.length; i++) {
+          const action = qrActions[i];
+          const actionNum = i + 1;
+          
+          switch (action.actionType) {
+            case 'call':
+              if (!action.actionData.phone?.trim()) {
+                toast({
+                  title: "⚠️ Action Incomplete",
+                  description: `Action #${actionNum} (Call) needs a phone number.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              break;
+            case 'website':
+              if (!action.actionData.url?.trim()) {
+                toast({
+                  title: "⚠️ Action Incomplete",
+                  description: `Action #${actionNum} (Website) needs a URL.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              break;
+            case 'whatsapp':
+              if (!action.actionData.phone?.trim()) {
+                toast({
+                  title: "⚠️ Action Incomplete",
+                  description: `Action #${actionNum} (WhatsApp) needs a phone number.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              break;
+            case 'directions':
+              if (!action.actionData.address?.trim() && (!action.actionData.latitude || !action.actionData.longitude)) {
+                toast({
+                  title: "⚠️ Action Incomplete",
+                  description: `Action #${actionNum} (Directions) needs either an address or coordinates.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              break;
+            case 'vcard':
+              if (!action.actionData.firstName?.trim() || !action.actionData.lastName?.trim()) {
+                toast({
+                  title: "⚠️ Action Incomplete",
+                  description: `Action #${actionNum} (Contact) needs first and last name.`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              break;
+          }
+        }
+        
+        // This will redirect to our action menu page
+        qrUrl = `${window.location.origin}/menu/PLACEHOLDER`;
         break;
     }
 
     setLoading(true);
-    setShowProgress(true);
     setQrCodeDataUrl('');
 
-    // Defer actual QR rendering until progress completes
-    const performGeneration = async () => {
-      try {
-        // Generate QR code with canvas for logo support
-        const canvas = document.createElement('canvas');
-        await QRCode.toCanvas(canvas, qrUrl, {
-          width: 400,
-          margin: 2,
-          color: {
-            dark: darkColor,
-            light: lightColor
-          }
-        });
-
-        // If logo is present, overlay it
-        if (logoDataUrl) {
-          await overlayLogo(canvas);
+    // Generate QR code immediately
+    try {
+      // Generate QR code with canvas for logo support
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, qrUrl, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: darkColor,
+          light: lightColor
         }
+      });
 
-        const dataUrl = canvas.toDataURL();
-        setQrCodeDataUrl(dataUrl);
-        if (!hasGeneratedOnce) {
-          toast({
-            title: 'Success',
-            description: 'Your custom, forever-QR Code is ready! 🎉',
-          });
-          setHasGeneratedOnce(true);
-        } else {
-          toast({
-            title: 'Updated',
-            description: 'QR code generated successfully.',
-          });
-        }
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to generate QR code',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-        setShowProgress(false);
+      // If logo is present, overlay it
+      if (logoDataUrl) {
+        await overlayLogo(canvas);
       }
-    };
 
-    // Store function for use after countdown completes
-    pendingGenerationRef.current = performGeneration;
+      const dataUrl = canvas.toDataURL();
+      setQrCodeDataUrl(dataUrl);
+      if (!hasGeneratedOnce) {
+        toast({
+          title: 'Success',
+          description: 'Your custom, forever-QR Code is ready! 🎉',
+        });
+        setHasGeneratedOnce(true);
+      } else {
+        toast({
+          title: 'Updated',
+          description: 'QR code generated successfully.',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to generate QR code: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Holds the pending generation callback until progress completes
-  const pendingGenerationRef = useRef<null | (() => Promise<void>)>(null);
 
   // Logo overlay function
   const overlayLogo = async (canvas: HTMLCanvasElement): Promise<void> => {
@@ -537,6 +677,77 @@ export const QRGenerator = () => {
   const removeLogo = () => {
     setLogoFile(null);
     setLogoDataUrl('');
+  };
+
+  // Logo upload with color extraction
+  const handleLogoUploadWithColors = (file: File) => {
+    handleLogoUpload(file); // Existing logo upload logic
+    
+    // Extract colors from the uploaded logo
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx?.drawImage(img, 0, 0);
+          
+          // Simple color extraction (get most prominent colors)
+          const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+          if (imageData) {
+            const colors = extractColorsFromImageData(imageData);
+            setExtractedColors(colors);
+            
+            // Auto-set brand colors if not already set
+            if (!brandColors.primary && colors.length > 0) {
+              setBrandColors({
+                primary: colors[0],
+                secondary: colors[1] || colors[0],
+                accent: colors[2] || colors[0],
+                background: '#FFFFFF'
+              });
+              setDarkColor(colors[0]);
+            }
+          }
+        } catch (error) {
+          console.error('Error extracting colors:', error);
+        }
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Simple color extraction function
+  const extractColorsFromImageData = (imageData: ImageData): string[] => {
+    const data = imageData.data;
+    const colorMap = new Map<string, number>();
+    
+    // Sample every 10th pixel to improve performance
+    for (let i = 0; i < data.length; i += 40) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      
+      // Skip transparent pixels
+      if (a < 128) continue;
+      
+      // Convert to hex
+      const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+      
+      // Count occurrences
+      colorMap.set(hex, (colorMap.get(hex) || 0) + 1);
+    }
+    
+    // Sort by frequency and return top colors
+    return Array.from(colorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([color]) => color);
   };
 
   // Image upload & palette extraction
@@ -895,14 +1106,14 @@ export const QRGenerator = () => {
     }
   };
 
-  const generateVCardString = (data: VCardData): string => {
+  const generateVCardString = (data: ContactData): string => {
     const vCard = [
       'BEGIN:VCARD',
       'VERSION:3.0',
       data.firstName || data.lastName ? `FN:${(data.firstName || '')} ${(data.lastName || '')}`.trim() : '',
       data.firstName ? `N:${data.lastName || ''};${data.firstName};;;` : '',
-      data.organization ? `ORG:${data.organization}` : '',
-      data.title ? `TITLE:${data.title}` : '',
+      data.company ? `ORG:${data.company}` : '',
+      data.jobTitle ? `TITLE:${data.jobTitle}` : '',
       data.phone ? `TEL:${data.phone}` : '',
       data.email ? `EMAIL:${data.email}` : '',
       data.website ? `URL:${data.website}` : '',
@@ -911,6 +1122,35 @@ export const QRGenerator = () => {
     ].filter(line => line && !line.endsWith(':')).join('\n');
     
     return vCard;
+  };
+
+  const generateSocialUrl = (data: SocialsData): string => {
+    const { platform, username, profileUrl } = data;
+    
+    if (profileUrl && profileUrl.trim()) {
+      return profileUrl.startsWith('http') ? profileUrl : `https://${profileUrl}`;
+    }
+    
+    const cleanUsername = username?.replace('@', '') || '';
+    
+    switch (platform) {
+      case 'instagram':
+        return `https://instagram.com/${cleanUsername}`;
+      case 'facebook':
+        return `https://facebook.com/${cleanUsername}`;
+      case 'linkedin':
+        return `https://linkedin.com/in/${cleanUsername}`;
+      case 'twitter':
+        return `https://twitter.com/${cleanUsername}`;
+      case 'tiktok':
+        return `https://tiktok.com/@${cleanUsername}`;
+      case 'youtube':
+        return `https://youtube.com/@${cleanUsername}`;
+      case 'snapchat':
+        return `https://snapchat.com/add/${cleanUsername}`;
+      default:
+        return `https://${platform}.com/${cleanUsername}`;
+    }
   };
 
   const generateEventString = (data: EventData): string => {
@@ -944,13 +1184,22 @@ export const QRGenerator = () => {
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setDestinationUrl('');
+    setUrl('');
+    setPdfFile(null);
     setMultiUrls([{ url: '', weight: 1, label: '' }]);
-    setActionData({});
-    setGeoData({});
-    setVCardData({});
+    setUploadFile(null);
+    setContactData({});
+    setSocialsData({});
     setTextContent('');
-    setEventData({});
+    setAppData({});
+    setLocationData({});
+    setEmailData({});
+    setSmsData({});
+    setPhoneData({});
+    setQrRules([]);
+    setQrActions([]);
+    setBrandColors({});
+    setExtractedColors([]);
     setQrCodeDataUrl('');
     setLogoFile(null);
     setLogoDataUrl('');
@@ -1020,89 +1269,114 @@ export const QRGenerator = () => {
               QR Code Generator
             </CardTitle>
             <CardDescription className="text-body">
-              Create static or dynamic QR codes for your URLs
+              Enter a URL to generate your QR code instantly
             </CardDescription>
           </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="title" className="text-sm font-medium">
-                Title <span className="text-red-500" aria-hidden="true">*</span>
-              </Label>
-              <span className={`text-xs ${title.length > 100 ? 'text-red-500' : 'text-gray-500'}`}>
-                {title.length}/100
-              </span>
-            </div>
+          {/* MVP: Main URL Input */}
+          <div className="space-y-2">
+            <Label htmlFor="url" className="text-sm font-medium">Enter URL</Label>
             <Input
-              id="title"
-              placeholder="Enter QR code title (required)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={`rounded-xl border-gray-200 focus:border-primary focus:ring-primary/20 focus:ring-2 mobile-input ${
-                title.length > 100 ? 'border-red-300 focus:border-red-500' : ''
-              }`}
-              maxLength={120}
-              required
-              aria-describedby={title.length > 100 ? "title-error" : "title-help"}
+              id="url"
+              placeholder="Enter a URL"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="rounded-xl text-base h-12"
+              autoFocus
             />
-            {title.length > 100 ? (
-              <p id="title-error" className="text-xs text-red-500" role="alert">
-                Title is too long. Please reduce by {title.length - 100} characters.
-              </p>
-            ) : (
-              <p id="title-help" className="text-xs text-gray-500">
-                Give your QR code a descriptive name for easy identification.
-              </p>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="description">Description (optional)</Label>
-              <span className={`text-xs ${description.length > 500 ? 'text-red-500' : 'text-gray-500'}`}>
-                {description.length}/500
-              </span>
-            </div>
-              <Textarea
-                id="description"
-                placeholder="Enter description (helps users understand your QR code)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className={`smooth-transition mobile-input ${
-                  description.length > 500 ? 'border-red-300 focus:border-red-500' : ''
-                }`}
-                rows={3}
-                maxLength={520} // Allow slight overage
-              />
-            {description.length > 500 && (
-              <p className="text-xs text-red-500">
-                Description is too long. Please reduce by {description.length - 500} characters.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="qr-type">QR Code Type</Label>
-            <Select value={qrType} onValueChange={(value: 'static' | 'dynamic' | 'multi-url' | 'action' | 'geo' | 'vcard' | 'text' | 'event') => setQrType(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="static">Static QR Code</SelectItem>
-                <SelectItem value="dynamic">Dynamic QR Code</SelectItem>
-                <SelectItem value="multi-url">Multi-URL QR Code</SelectItem>
-                <SelectItem value="action">Action QR Code</SelectItem>
-                <SelectItem value="geo">Geo-Tagged QR Code</SelectItem>
-                <SelectItem value="vcard">vCard Contact</SelectItem>
-                <SelectItem value="text">Plain Text</SelectItem>
-                <SelectItem value="event">Event Invite</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Style & Branding */}
+          {/* Advanced Options (Collapsible) */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium flex items-center gap-2"><Palette className="h-4 w-4" /> Style & Branding</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+              className="w-full justify-between p-3 h-auto text-left border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
+            >
+              <span className="text-sm text-gray-600">Advanced Options</span>
+              <span className={`transform transition-transform ${showAdvancedOptions ? 'rotate-180' : ''}`}>
+                ↓
+              </span>
+            </Button>
+            
+            {showAdvancedOptions && (
+              <div className="space-y-4 p-4 border border-gray-200 rounded-xl bg-gray-50">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="title" className="text-sm font-medium">Title (optional)</Label>
+                    <span className={`text-xs ${title.length > 100 ? 'text-red-500' : 'text-gray-500'}`}>
+                      {title.length}/100
+                    </span>
+                  </div>
+                  <Input
+                    id="title"
+                    placeholder="Name your QR code"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="rounded-lg"
+                    maxLength={120}
+                  />
+                  {title.length > 100 && (
+                    <p className="text-xs text-red-500">
+                      Title is too long. Please reduce by {title.length - 100} characters.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="description">Description (optional)</Label>
+                    <span className={`text-xs ${description.length > 500 ? 'text-red-500' : 'text-gray-500'}`}>
+                      {description.length}/500
+                    </span>
+                  </div>
+                    <Textarea
+                      id="description"
+                      placeholder="Add a description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="rounded-lg"
+                      rows={3}
+                      maxLength={520}
+                    />
+                  {description.length > 500 && (
+                    <p className="text-xs text-red-500">
+                      Description is too long. Please reduce by {description.length - 500} characters.
+                    </p>
+                  )}
+                </div>
+
+                {/* Future: QR Type Selector */}
+                <div className="text-center py-2">
+                  <Button variant="outline" size="sm" disabled className="opacity-50">
+                    + Add Other QR Types
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-1">More QR types coming soon</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Customize Design (Collapsible, shown after generation) */}
+          {(qrCodeDataUrl || autoPreview) && (
+            <div className="space-y-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowCustomizeDesign(!showCustomizeDesign)}
+                className="w-full justify-between p-3 h-auto text-left border border-dashed border-gray-300 hover:border-gray-400 transition-colors"
+              >
+                <span className="text-sm text-gray-600 flex items-center gap-2">
+                  <Palette className="h-4 w-4" /> Customize Design
+                </span>
+                <span className={`transform transition-transform ${showCustomizeDesign ? 'rotate-180' : ''}`}>
+                  ↓
+                </span>
+              </Button>
+              
+              {showCustomizeDesign && (
+                <div className="space-y-4 p-4 border border-gray-200 rounded-xl bg-gray-50">
             <div className="flex flex-wrap items-center gap-3">
               <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer hover:bg-accent/10">
                 <UploadCloud className="h-4 w-4" />
@@ -1126,6 +1400,71 @@ export const QRGenerator = () => {
                 <span className="text-xs">Light</span>
               </div>
             </div>
+            {/* Extracted Colors from Logo */}
+            {extractedColors.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Colors from your logo</Label>
+                <div className="flex flex-wrap gap-2">
+                  {extractedColors.map((color, i) => (
+                    <button 
+                      key={i} 
+                      type="button" 
+                      aria-label={`Use extracted color ${color}`}
+                      className="h-8 w-8 rounded-lg border-2 border-gray-200 hover:border-primary transition-colors"
+                      style={{ backgroundColor: color }}
+                      onClick={() => setDarkColor(color)}
+                      title={`Click to use: ${color}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Brand Color Palette */}
+            {brandColors.primary && (
+              <div className="space-y-2">
+                <Label className="text-xs">Brand Colors</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="text-center">
+                    <div 
+                      className="h-8 w-full rounded-lg border cursor-pointer"
+                      style={{ backgroundColor: brandColors.primary }}
+                      onClick={() => setDarkColor(brandColors.primary!)}
+                    />
+                    <span className="text-xs text-gray-500">Primary</span>
+                  </div>
+                  {brandColors.secondary && (
+                    <div className="text-center">
+                      <div 
+                        className="h-8 w-full rounded-lg border cursor-pointer"
+                        style={{ backgroundColor: brandColors.secondary }}
+                        onClick={() => setDarkColor(brandColors.secondary!)}
+                      />
+                      <span className="text-xs text-gray-500">Secondary</span>
+                    </div>
+                  )}
+                  {brandColors.accent && (
+                    <div className="text-center">
+                      <div 
+                        className="h-8 w-full rounded-lg border cursor-pointer"
+                        style={{ backgroundColor: brandColors.accent }}
+                        onClick={() => setDarkColor(brandColors.accent!)}
+                      />
+                      <span className="text-xs text-gray-500">Accent</span>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <div 
+                      className="h-8 w-full rounded-lg border cursor-pointer"
+                      style={{ backgroundColor: brandColors.background || '#FFFFFF' }}
+                      onClick={() => setLightColor(brandColors.background || '#FFFFFF')}
+                    />
+                    <span className="text-xs text-gray-500">Background</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {palette.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {palette.map((c, i) => (
@@ -1133,123 +1472,131 @@ export const QRGenerator = () => {
                 ))}
               </div>
             )}
-          </div>
 
-          {/* Logo Upload & Embedding */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium flex items-center gap-2">
-              <Upload className="h-4 w-4" /> 
-              Logo & Branding
-            </Label>
-            
-            {!logoDataUrl ? (
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center bg-gray-50">
-                <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm text-gray-600 mb-2">
-                  Add your logo to QR code
-                </p>
-                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer hover:bg-accent/10 bg-white">
-                  <span className="text-sm">Choose Image</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleLogoUpload(f);
-                    }}
-                  />
-                </label>
-                <p className="text-xs text-gray-500 mt-2">
-                  PNG, JPG up to 5MB
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-white">
-                  <img
-                    src={logoDataUrl}
-                    alt="Logo preview"
-                    className="w-10 h-10 object-cover rounded-lg border border-gray-100"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">Logo uploaded</p>
-                    <p className="text-xs text-gray-500">
-                      {logoFile?.name}
-                    </p>
+                  {/* Logo Upload & Embedding */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Upload className="h-4 w-4" /> 
+                      Logo & Branding
+                    </Label>
+                    
+                    {!logoDataUrl ? (
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center bg-gray-50">
+                        <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Add your logo to QR code
+                        </p>
+                        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer hover:bg-accent/10 bg-white">
+                          <span className="text-sm">Choose Image</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleLogoUploadWithColors(f);
+                            }}
+                          />
+                        </label>
+                        <p className="text-xs text-gray-500 mt-2">
+                          PNG, JPG up to 5MB
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-white">
+                          <img
+                            src={logoDataUrl}
+                            alt="Logo preview"
+                            className="w-10 h-10 object-cover rounded-lg border border-gray-100"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">Logo uploaded</p>
+                            <p className="text-xs text-gray-500">
+                              {logoFile?.name}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={removeLogo}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+
+                        {/* Logo Size Slider */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">Logo Size</Label>
+                            <span className="text-sm text-gray-500">
+                              {logoSize}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[logoSize]}
+                            onValueChange={(value) => setLogoSize(value[0])}
+                            max={30}
+                            min={5}
+                            step={1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span>5%</span>
+                            <span>30%</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeLogo}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    Remove
-                  </Button>
                 </div>
+              )}
+            </div>
+          )}
 
-                {/* Logo Size Slider */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Logo Size</Label>
-                    <span className="text-sm text-gray-500">
-                      {logoSize}%
-                    </span>
-                  </div>
-                  <Slider
-                    value={[logoSize]}
-                    onValueChange={(value) => setLogoSize(value[0])}
-                    max={30}
-                    min={5}
-                    step={1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>5%</span>
-                    <span>30%</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Static/Dynamic URL Input as larger textarea */}
-          {(qrType === 'static' || qrType === 'dynamic') && (
+          {/* URL */}
+          {qrType === 'url' && (
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="url">Destination URL</Label>
-                <span className={`text-xs ${destinationUrl.length > 2000 ? 'text-red-500' : 'text-gray-500'}`}>
-                  {destinationUrl.length}/2000
-                </span>
-              </div>
-              <Textarea
+              <Label htmlFor="url">URL *</Label>
+              <Input
                 id="url"
                 placeholder="https://example.com or www.example.com"
-                value={destinationUrl}
-                onChange={(e) => setDestinationUrl(e.target.value)}
-                rows={4}
-                className={`smooth-transition text-base rounded-xl ${
-                  destinationUrl.length > 2000 ? 'border-red-300 focus:border-red-500' : ''
-                }`}
-                maxLength={2100} // Allow slight overage
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="rounded-xl"
+                required
               />
-              {destinationUrl.length > 2000 && (
-                <p className="text-xs text-red-500">
-                  URL is too long. Please reduce by {destinationUrl.length - 2000} characters.
-                </p>
-              )}
               <p className="text-xs text-gray-500">
-                Supported: HTTP/HTTPS websites, FTP, email (mailto:), phone (tel:)
+                Enter a valid HTTP/HTTPS URL
               </p>
             </div>
           )}
 
-          {/* Multi-URL Configuration */}
+          {/* PDF Upload */}
+          {qrType === 'pdf' && (
+            <div className="space-y-2">
+              <Label htmlFor="pdf-upload">Upload PDF File *</Label>
+              <input
+                id="pdf-upload"
+                type="file"
+                accept=".pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                required
+              />
+              <p className="text-xs text-gray-500">
+                Maximum file size: 10MB
+              </p>
+            </div>
+          )}
+
+          {/* Multi-URL */}
           {qrType === 'multi-url' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label>Multiple URLs</Label>
+                <Label>URLs *</Label>
                 <Button type="button" onClick={addMultiUrl} size="sm" variant="outline">
                   <Plus className="h-4 w-4 mr-1" />
                   Add URL
@@ -1276,134 +1623,33 @@ export const QRGenerator = () => {
                     placeholder="https://example.com"
                     value={multiUrl.url}
                     onChange={(e) => updateMultiUrl(index, 'url', e.target.value)}
+                    required
                   />
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Label</Label>
-                      <Input
-                        placeholder="Label"
-                        value={multiUrl.label}
-                        onChange={(e) => updateMultiUrl(index, 'label', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Weight</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={multiUrl.weight}
-                        onChange={(e) => updateMultiUrl(index, 'weight', parseInt(e.target.value) || 1)}
-                      />
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Action Configuration */}
-          {qrType === 'action' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Action Type</Label>
-                <Select value={actionType} onValueChange={(value: 'email' | 'phone' | 'sms') => setActionType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="phone">Phone Call</SelectItem>
-                    <SelectItem value="sms">SMS Message</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {actionType === 'email' && (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Email address"
-                    value={actionData.email || ''}
-                    onChange={(e) => setActionData({ ...actionData, email: e.target.value })}
-                  />
-                  <Input
-                    placeholder="Subject (optional)"
-                    value={actionData.subject || ''}
-                    onChange={(e) => setActionData({ ...actionData, subject: e.target.value })}
-                  />
-                  <Textarea
-                    placeholder="Email body (optional)"
-                    value={actionData.body || ''}
-                    onChange={(e) => setActionData({ ...actionData, body: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              {(actionType === 'phone' || actionType === 'sms') && (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Phone number"
-                    value={actionData.phone || ''}
-                    onChange={(e) => setActionData({ ...actionData, phone: e.target.value })}
-                  />
-                  {actionType === 'sms' && (
-                    <Textarea
-                      placeholder="SMS message (optional)"
-                      value={actionData.message || ''}
-                      onChange={(e) => setActionData({ ...actionData, message: e.target.value })}
-                      rows={3}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Geo Configuration */}
-          {qrType === 'geo' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Location</Label>
-                <Button type="button" onClick={getCurrentLocation} size="sm" variant="outline">
-                  <MapPin className="h-4 w-4 mr-1" />
-                  Use Current Location
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Latitude</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    placeholder="40.7128"
-                    value={geoData.latitude || ''}
-                    onChange={(e) => setGeoData({ ...geoData, latitude: parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Longitude</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    placeholder="-74.0060"
-                    value={geoData.longitude || ''}
-                    onChange={(e) => setGeoData({ ...geoData, longitude: parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
-              
-              <Input
-                placeholder="Address (optional)"
-                value={geoData.address || ''}
-                onChange={(e) => setGeoData({ ...geoData, address: e.target.value })}
+          {/* File Upload */}
+          {qrType === 'file' && (
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">Upload File *</Label>
+              <input
+                id="file-upload"
+                type="file"
+                accept=".doc,.docx,.xls,.xlsx,.zip,.png,.jpg,.jpeg,.gif,.pdf"
+                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                required
               />
+              <p className="text-xs text-gray-500">
+                Supported: DOC, XLS, ZIP, Images, PDF (Max: 25MB)
+              </p>
             </div>
           )}
 
-          {/* vCard Configuration */}
-          {qrType === 'vcard' && (
+          {/* Contact (vCard) */}
+          {qrType === 'contact' && (
             <div className="space-y-4">
               <Label>Contact Information</Label>
               
@@ -1412,165 +1658,277 @@ export const QRGenerator = () => {
                   <Label className="text-xs">First Name *</Label>
                   <Input
                     placeholder="John"
-                    value={vCardData.firstName || ''}
-                    onChange={(e) => setVCardData({ ...vCardData, firstName: e.target.value })}
+                    value={contactData.firstName || ''}
+                    onChange={(e) => setContactData({ ...contactData, firstName: e.target.value })}
+                    required
                   />
                 </div>
                 <div>
                   <Label className="text-xs">Last Name *</Label>
                   <Input
                     placeholder="Doe"
-                    value={vCardData.lastName || ''}
-                    onChange={(e) => setVCardData({ ...vCardData, lastName: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Organization</Label>
-                  <Input
-                    placeholder="Company Name"
-                    value={vCardData.organization || ''}
-                    onChange={(e) => setVCardData({ ...vCardData, organization: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Job Title</Label>
-                  <Input
-                    placeholder="CEO"
-                    value={vCardData.title || ''}
-                    onChange={(e) => setVCardData({ ...vCardData, title: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Phone</Label>
-                  <Input
-                    placeholder="+1234567890"
-                    value={vCardData.phone || ''}
-                    onChange={(e) => setVCardData({ ...vCardData, phone: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Email</Label>
-                  <Input
-                    placeholder="john@example.com"
-                    value={vCardData.email || ''}
-                    onChange={(e) => setVCardData({ ...vCardData, email: e.target.value })}
+                    value={contactData.lastName || ''}
+                    onChange={(e) => setContactData({ ...contactData, lastName: e.target.value })}
+                    required
                   />
                 </div>
               </div>
               
               <Input
+                placeholder="Phone Number *"
+                value={contactData.phone || ''}
+                onChange={(e) => setContactData({ ...contactData, phone: e.target.value })}
+                required
+              />
+              
+              <Input
+                placeholder="Email *"
+                value={contactData.email || ''}
+                onChange={(e) => setContactData({ ...contactData, email: e.target.value })}
+                required
+              />
+              
+              <Input
+                placeholder="Company (optional)"
+                value={contactData.company || ''}
+                onChange={(e) => setContactData({ ...contactData, company: e.target.value })}
+              />
+              
+              <Input
+                placeholder="Job Title (optional)"
+                value={contactData.jobTitle || ''}
+                onChange={(e) => setContactData({ ...contactData, jobTitle: e.target.value })}
+              />
+              
+              <Input
                 placeholder="Website (optional)"
-                value={vCardData.website || ''}
-                onChange={(e) => setVCardData({ ...vCardData, website: e.target.value })}
+                value={contactData.website || ''}
+                onChange={(e) => setContactData({ ...contactData, website: e.target.value })}
               />
               
               <Input
                 placeholder="Address (optional)"
-                value={vCardData.address || ''}
-                onChange={(e) => setVCardData({ ...vCardData, address: e.target.value })}
+                value={contactData.address || ''}
+                onChange={(e) => setContactData({ ...contactData, address: e.target.value })}
               />
             </div>
           )}
 
-          {/* Text Configuration */}
+          {/* Socials */}
+          {qrType === 'socials' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Platform *</Label>
+                <Select value={socialsData.platform || ''} onValueChange={(value) => setSocialsData({ ...socialsData, platform: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select platform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    <SelectItem value="twitter">Twitter/X</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                    <SelectItem value="youtube">YouTube</SelectItem>
+                    <SelectItem value="snapchat">Snapchat</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Input
+                placeholder="Username/Handle (e.g., @username) *"
+                value={socialsData.username || ''}
+                onChange={(e) => setSocialsData({ ...socialsData, username: e.target.value })}
+                required
+              />
+              
+              <Input
+                placeholder="Profile URL (optional)"
+                value={socialsData.profileUrl || ''}
+                onChange={(e) => setSocialsData({ ...socialsData, profileUrl: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* Plain Text */}
           {qrType === 'text' && (
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="text-content">Text Content</Label>
-                <span className={`text-xs ${textContent.length > 2000 ? 'text-red-500' : 'text-gray-500'}`}>
-                  {textContent.length}/2000
-                </span>
-              </div>
+              <Label htmlFor="text-content">Text Content *</Label>
               <Textarea
                 id="text-content"
                 placeholder="Enter any text content you want to encode in the QR code..."
                 value={textContent}
                 onChange={(e) => setTextContent(e.target.value)}
                 rows={4}
-                className={`smooth-transition ${
-                  textContent.length > 2000 ? 'border-red-300 focus:border-red-500' : ''
-                }`}
-                maxLength={2100} // Allow slight overage
+                className="rounded-xl"
+                required
               />
-              {textContent.length > 2000 && (
-                <p className="text-xs text-red-500">
-                  Text is too long. Please reduce by {textContent.length - 2000} characters for optimal scanning.
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-500">
                 This text will be displayed when the QR code is scanned
               </p>
             </div>
           )}
 
-          {/* Event Configuration */}
-          {qrType === 'event' && (
+          {/* App */}
+          {qrType === 'app' && (
             <div className="space-y-4">
-              <Label>Event Details</Label>
+              <Label>App Store URLs</Label>
               
               <div className="space-y-2">
-                <Label className="text-xs">Event Title *</Label>
+                <Label className="text-xs">iOS App Store URL</Label>
                 <Input
-                  placeholder="Team Meeting"
-                  value={eventData.title || ''}
-                  onChange={(e) => setEventData({ ...eventData, title: e.target.value })}
+                  placeholder="https://apps.apple.com/app/..."
+                  value={appData.iosUrl || ''}
+                  onChange={(e) => setAppData({ ...appData, iosUrl: e.target.value })}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label className="text-xs">Description</Label>
-                <Textarea
-                  placeholder="Weekly team sync meeting"
-                  value={eventData.description || ''}
-                  onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
-                  rows={2}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label className="text-xs">Location</Label>
+                <Label className="text-xs">Android Play Store URL</Label>
                 <Input
-                  placeholder="Conference Room A"
-                  value={eventData.location || ''}
-                  onChange={(e) => setEventData({ ...eventData, location: e.target.value })}
+                  placeholder="https://play.google.com/store/apps/..."
+                  value={appData.androidUrl || ''}
+                  onChange={(e) => setAppData({ ...appData, androidUrl: e.target.value })}
                 />
               </div>
               
+              <p className="text-xs text-gray-500">
+                Enter at least one app store URL
+              </p>
+            </div>
+          )}
+
+          {/* Location */}
+          {qrType === 'location' && (
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs">Start Date & Time *</Label>
+                  <Label className="text-xs">Latitude *</Label>
                   <Input
-                    type="datetime-local"
-                    value={eventData.startDate || ''}
-                    onChange={(e) => setEventData({ ...eventData, startDate: e.target.value })}
+                    type="number"
+                    step="any"
+                    placeholder="40.7128"
+                    value={locationData.latitude || ''}
+                    onChange={(e) => setLocationData({ ...locationData, latitude: parseFloat(e.target.value) })}
+                    required
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">End Date & Time</Label>
+                  <Label className="text-xs">Longitude *</Label>
                   <Input
-                    type="datetime-local"
-                    value={eventData.endDate || ''}
-                    onChange={(e) => setEventData({ ...eventData, endDate: e.target.value })}
+                    type="number"
+                    step="any"
+                    placeholder="-74.0060"
+                    value={locationData.longitude || ''}
+                    onChange={(e) => setLocationData({ ...locationData, longitude: parseFloat(e.target.value) })}
+                    required
                   />
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="all-day"
-                  checked={eventData.allDay || false}
-                  onChange={(e) => setEventData({ ...eventData, allDay: e.target.checked })}
-                  className="rounded"
+              <Input
+                placeholder="Place Name (optional)"
+                value={locationData.placeName || ''}
+                onChange={(e) => setLocationData({ ...locationData, placeName: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* SMS */}
+          {qrType === 'sms' && (
+            <div className="space-y-4">
+              <Input
+                placeholder="Phone Number *"
+                value={smsData.phone || ''}
+                onChange={(e) => setSmsData({ ...smsData, phone: e.target.value })}
+                required
+              />
+              
+              <Textarea
+                placeholder="Message Body *"
+                value={smsData.message || ''}
+                onChange={(e) => setSmsData({ ...smsData, message: e.target.value })}
+                rows={3}
+                required
+              />
+            </div>
+          )}
+
+          {/* Email */}
+          {qrType === 'email' && (
+            <div className="space-y-4">
+              <Input
+                placeholder="Recipient Email Address *"
+                value={emailData.email || ''}
+                onChange={(e) => setEmailData({ ...emailData, email: e.target.value })}
+                required
+              />
+              
+              <Input
+                placeholder="Subject *"
+                value={emailData.subject || ''}
+                onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })}
+                required
+              />
+              
+              <Textarea
+                placeholder="Body *"
+                value={emailData.body || ''}
+                onChange={(e) => setEmailData({ ...emailData, body: e.target.value })}
+                rows={4}
+                required
+              />
+            </div>
+          )}
+
+          {/* Phone */}
+          {qrType === 'phone' && (
+            <div className="space-y-2">
+              <Label htmlFor="phone-number">Phone Number *</Label>
+              <Input
+                id="phone-number"
+                placeholder="+1234567890"
+                value={phoneData.phone || ''}
+                onChange={(e) => setPhoneData({ ...phoneData, phone: e.target.value })}
+                required
+              />
+              <p className="text-xs text-gray-500">
+                Include country code for international numbers
+              </p>
+            </div>
+          )}
+
+          {/* Context-Aware QR */}
+          {qrType === 'context-aware' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fallback-url">Fallback URL *</Label>
+                <Input
+                  id="fallback-url"
+                  placeholder="https://example.com (shown when no rules match)"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  required
                 />
-                <Label htmlFor="all-day" className="text-sm">All day event</Label>
+                <p className="text-xs text-gray-500">
+                  This URL will be used when no conditional rules match
+                </p>
               </div>
+              
+              <RuleBuilder 
+                rules={qrRules} 
+                onRulesChange={setQrRules}
+              />
+            </div>
+          )}
+
+          {/* Multi-Action QR */}
+          {qrType === 'multi-action' && (
+            <div className="space-y-4">
+              <ActionBuilder 
+                actions={qrActions} 
+                onActionsChange={setQrActions}
+              />
             </div>
           )}
 
@@ -1589,16 +1947,6 @@ export const QRGenerator = () => {
             )}
           </Button>
 
-          <ProgressCountdown
-            isActive={showProgress}
-            onComplete={async () => {
-              if (pendingGenerationRef.current) {
-                await pendingGenerationRef.current();
-                pendingGenerationRef.current = null;
-              }
-            }}
-            duration={3000}
-          />
         </CardContent>
       </Card>
 

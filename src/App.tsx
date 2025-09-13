@@ -10,6 +10,7 @@ import { registerServiceWorker } from "@/utils/sw-register";
 // Lazy load pages for better performance
 const Index = lazy(() => import("./pages/Index"));
 const Redirect = lazy(() => import("./pages/Redirect"));
+const ActionMenu = lazy(() => import("./pages/ActionMenu"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/qr/:qrId" element={<Redirect />} />
+              <Route path="/menu/:qrId" element={<ActionMenu />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

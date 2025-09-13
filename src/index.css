@@ -466,4 +466,141 @@ All colors MUST be HSL.
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* Toast notifications - solid backgrounds */
+  /* Radix UI Toast styling */
+  [data-radix-toast-viewport] {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 100;
+  }
+
+  [data-radix-toast-viewport] [data-state="open"] {
+    background-color: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Sonner Toast styling - solid backgrounds */
+  .toaster {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 100;
+  }
+
+  .toaster .toast {
+    background-color: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    backdrop-filter: none !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Success toast styling */
+  .toast[data-type="success"],
+  .toaster .toast[data-type="success"] {
+    background-color: hsl(var(--success)) !important;
+    border-color: hsl(105 55% 85%) !important;
+    color: hsl(var(--success-foreground)) !important;
+  }
+
+  /* Error/destructive toast styling */
+  .toast[data-type="error"],
+  .toaster .toast[data-type="error"],
+  .destructive {
+    background-color: hsl(var(--destructive)) !important;
+    border-color: hsl(0 84.2% 50%) !important;
+    color: hsl(var(--destructive-foreground)) !important;
+  }
+
+  /* Warning toast styling */
+  .toast[data-type="warning"],
+  .toaster .toast[data-type="warning"] {
+    background-color: hsl(48 96% 95%) !important;
+    border-color: hsl(48 96% 80%) !important;
+    color: hsl(25 95% 25%) !important;
+  }
+
+  /* Info toast styling */
+  .toast[data-type="info"],
+  .toaster .toast[data-type="info"] {
+    background-color: hsl(var(--primary-light)) !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  /* Dark mode toast adjustments */
+  .dark .toaster .toast,
+  .dark [data-radix-toast-viewport] [data-state="open"] {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .toast[data-type="success"],
+  .dark .toaster .toast[data-type="success"] {
+    background-color: hsl(var(--success)) !important;
+    border-color: hsl(105 29% 35%) !important;
+    color: hsl(var(--success-foreground)) !important;
+  }
+
+  .dark .toast[data-type="error"],
+  .dark .toaster .toast[data-type="error"] {
+    background-color: hsl(var(--destructive)) !important;
+    border-color: hsl(0 84.2% 50%) !important;
+    color: hsl(var(--destructive-foreground)) !important;
+  }
+
+  .dark .toast[data-type="warning"],
+  .dark .toaster .toast[data-type="warning"] {
+    background-color: hsl(25 95% 15%) !important;
+    border-color: hsl(25 95% 30%) !important;
+    color: hsl(48 96% 85%) !important;
+  }
+
+  .dark .toast[data-type="info"],
+  .dark .toaster .toast[data-type="info"] {
+    background-color: hsl(var(--primary-light)) !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary)) !important;
+  }
+
+  /* Additional toast styling to ensure solid backgrounds */
+  /* Override any potential transparency from libraries */
+  .toast,
+  [data-sonner-toast],
+  [data-radix-toast],
+  .sonner-toast {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: hsl(var(--card)) !important;
+    opacity: 1 !important;
+  }
+
+  /* Ensure toast containers are properly positioned */
+  .toast-container,
+  .sonner-toaster,
+  [data-radix-toast-viewport] {
+    position: fixed !important;
+    bottom: 1rem !important;
+    right: 1rem !important;
+    z-index: 100 !important;
+    pointer-events: none;
+  }
+
+  .toast-container > *,
+  .sonner-toaster > *,
+  [data-radix-toast-viewport] > * {
+    pointer-events: auto;
+  }
+
+  /* Remove any glassmorphism or blur effects */
+  .toast *,
+  .toaster * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }

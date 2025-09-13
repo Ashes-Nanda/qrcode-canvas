@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode, Copy, Grid2X2, Rows, Search, EyeIcon, Download, Share2, Calendar, Activity } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, ExternalLink, BarChart3, QrCode, Copy, Grid2X2, Rows, Search, EyeIcon, Download, Share2, Calendar, Activity, Smartphone, Upload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { EnhancedEmptyState } from '@/components/ui/enhanced-empty-state';
@@ -23,6 +23,10 @@ interface QRCode {
   action_type?: string;
   action_data?: any;
   geo_data?: any;
+  form_data?: any;
+  design_options?: any;
+  qr_image_url?: string;
+  content_preview?: string;
   is_active: boolean;
   scan_count: number;
   created_at: string;
@@ -30,11 +34,18 @@ interface QRCode {
 }
 
 // Component for displaying QR code images
-const QRCodeImage = ({ qrId, className }: { qrId: string; className?: string }) => {
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+const QRCodeImage = ({ qrId, qrImageUrl, className }: { qrId: string; qrImageUrl?: string; className?: string }) => {
+  const [qrDataUrl, setQrDataUrl] = useState<string>(qrImageUrl || '');
+  const [loading, setLoading] = useState(!qrImageUrl);
 
   useEffect(() => {
+    // If we already have a stored image URL, use it
+    if (qrImageUrl) {
+      setQrDataUrl(qrImageUrl);
+      setLoading(false);
+      return;
+    }
+
     const generateQRImage = async () => {
       try {
         const url = `${window.location.origin}/qr/${qrId}`;
@@ -52,7 +63,7 @@ const QRCodeImage = ({ qrId, className }: { qrId: string; className?: string }) 
       }
     };
     generateQRImage();
-  }, [qrId]);
+  }, [qrId, qrImageUrl]);
 
   if (loading) {
     return (
@@ -262,6 +273,46 @@ const QRListComponent = () => {
   };
 
   const getQRContent = (qr: QRCode) => {
+    // Use content_preview if available (from new wizard)
+    if (qr.content_preview) {
+      return qr.content_preview.length > 100 ? qr.content_preview.substring(0, 100) + '...' : qr.content_preview;
+    }
+
+    // Handle wizard QR types using form_data
+    if (qr.form_data) {
+      switch (qr.qr_type) {
+        case 'url':
+          return qr.form_data.url || qr.destination_url || '';
+        case 'text':
+          const text = qr.form_data.text || qr.destination_url || '';
+          return text.length > 100 ? text.substring(0, 100) + '...' : text;
+        case 'contact':
+          return `${qr.form_data.firstName || ''} ${qr.form_data.lastName || ''}`.trim() || 'Contact';
+        case 'sms':
+          return `SMS to ${qr.form_data.phone || 'Unknown'}`;
+        case 'email':
+          return `Email to ${qr.form_data.email || 'Unknown'}`;
+        case 'phone':
+          return `Call ${qr.form_data.phone || 'Unknown'}`;
+        case 'location':
+          return qr.form_data.placeName || `${qr.form_data.latitude}, ${qr.form_data.longitude}`;
+        case 'app':
+          return qr.form_data.iosUrl || qr.form_data.androidUrl || 'App Store Links';
+        case 'socials':
+          return `${qr.form_data.platform || 'Social'}: ${qr.form_data.username || 'Profile'}`;
+        case 'pdf':
+        case 'file':
+          return qr.form_data.file?.name || 'File attachment';
+        case 'event':
+          return qr.form_data.title || 'Calendar Event';
+        case 'context-aware':
+          return `Smart QR with ${qr.form_data.rules?.length || 0} rules`;
+        case 'multi-action':
+          return `Multi-action with ${qr.form_data.actions?.length || 0} actions`;
+      }
+    }
+
+    // Legacy handling for older QR types
     switch (qr.qr_type) {
       case 'static':
       case 'dynamic':
@@ -288,21 +339,38 @@ const QRListComponent = () => {
 
   const getQRTypeIcon = (type: string) => {
     switch (type) {
+      case 'url':
       case 'static':
       case 'dynamic':
         return <ExternalLink className="w-3 h-3" />;
+      case 'text':
+        return <Edit className="w-3 h-3" />;
+      case 'contact':
+      case 'vcard':
+        return <Eye className="w-3 h-3" />;
+      case 'sms':
+      case 'email':
+      case 'phone':
+        return <Activity className="w-3 h-3" />;
+      case 'location':
+      case 'geo':
+        return <QrCode className="w-3 h-3" />;
+      case 'app':
+        return <Smartphone className="w-3 h-3" />;
+      case 'socials':
+        return <Share2 className="w-3 h-3" />;
+      case 'pdf':
+      case 'file':
+        return <Upload className="w-3 h-3" />;
+      case 'event':
+        return <Calendar className="w-3 h-3" />;
+      case 'context-aware':
+      case 'multi-action':
+        return <Activity className="w-3 h-3" />;
       case 'multi-url':
         return <Copy className="w-3 h-3" />;
       case 'action':
         return <Activity className="w-3 h-3" />;
-      case 'geo':
-        return <QrCode className="w-3 h-3" />;
-      case 'vcard':
-        return <Eye className="w-3 h-3" />;
-      case 'text':
-        return <Edit className="w-3 h-3" />;
-      case 'event':
-        return <Calendar className="w-3 h-3" />;
       default:
         return <QrCode className="w-3 h-3" />;
     }
@@ -403,14 +471,27 @@ const QRListComponent = () => {
             aria-label="Filter QR codes by type"
           >
           <option value="all">All types</option>
+          <option value="url">URL</option>
+          <option value="text">Text</option>
+          <option value="contact">Contact</option>
+          <option value="sms">SMS</option>
+          <option value="email">Email</option>
+          <option value="phone">Phone</option>
+          <option value="location">Location</option>
+          <option value="app">App</option>
+          <option value="socials">Social</option>
+          <option value="pdf">PDF</option>
+          <option value="file">File</option>
+          <option value="event">Event</option>
+          <option value="context-aware">Context-Aware</option>
+          <option value="multi-action">Multi-Action</option>
+          {/* Legacy types */}
           <option value="static">Static</option>
           <option value="dynamic">Dynamic</option>
           <option value="multi-url">Multi-URL</option>
           <option value="action">Action</option>
           <option value="geo">Geo</option>
           <option value="vcard">vCard</option>
-          <option value="text">Text</option>
-          <option value="event">Event</option>
           </select>
         </div>
         <div className="flex flex-col gap-1">
@@ -472,6 +553,7 @@ const QRListComponent = () => {
                   <div className="relative group/qr">
                     <QRCodeImage 
                       qrId={qr.id} 
+                      qrImageUrl={qr.qr_image_url}
                       className="w-24 h-24 bg-white shadow-sm border-2 border-white cursor-pointer transition-transform duration-200 hover:scale-110" 
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover/qr:bg-black/10 transition-colors duration-200 rounded-lg flex items-center justify-center">

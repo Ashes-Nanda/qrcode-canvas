@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/layout/Navigation';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
-import { QRGenerator } from '@/components/qr/QRGenerator';
+import { WizardLayout } from '@/components/qr/wizard/WizardLayout';
 import { QRList } from '@/components/qr/QRList';
 import { Analytics } from '@/components/analytics/Analytics';
 import { useToast } from '@/hooks/use-toast';
@@ -55,7 +55,7 @@ export const Dashboard = () => {
           />
         );
       case 'create':
-        return <QRGenerator />;
+        return <WizardLayout />;
       case 'manage':
         return <QRList />;
       case 'analytics':

@@ -19,8 +19,15 @@ export const ProgressCountdown: React.FC<ProgressCountdownProps> = ({
   const [countdown, setCountdown] = React.useState(3);
   const [isRunning, setIsRunning] = React.useState(false);
 
+  // Use ref to avoid dependency issues with onComplete callback
+  const onCompleteRef = React.useRef(onComplete);
+  React.useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
+
   React.useEffect(() => {
     if (isActive && !isRunning) {
+      console.log('Starting progress countdown');
       setIsRunning(true);
       setProgress(0);
       setCountdown(3);
@@ -45,18 +52,22 @@ export const ProgressCountdown: React.FC<ProgressCountdownProps> = ({
         setProgress(currentProgress);
 
         if (currentProgress >= 100) {
+          console.log('Progress countdown completed, calling onComplete');
           clearInterval(interval);
           setCountdown(0);
           setTimeout(() => {
-            onComplete?.();
+            onCompleteRef.current?.();
             setIsRunning(false);
           }, 200);
         }
       }, 100);
 
-      return () => clearInterval(interval);
+      return () => {
+        console.log('Cleaning up progress countdown interval');
+        clearInterval(interval);
+      };
     }
-  }, [isActive, duration, onComplete, isRunning]);
+  }, [isActive, duration, isRunning]);
 
   if (!isActive) return null;
 

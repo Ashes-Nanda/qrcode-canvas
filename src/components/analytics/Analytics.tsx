@@ -52,7 +52,7 @@ export const Analytics = () => {
       // Fetch QR codes stats
       const { data: qrData, error: qrError } = await supabase
         .from('qr_codes')
-        .select('id, title, scan_count, is_active, qr_type')
+        .select('id, title, scan_count, is_active, qr_type, form_data, content_preview')
         .eq('user_id', user.id);
 
       if (qrError) throw qrError;
