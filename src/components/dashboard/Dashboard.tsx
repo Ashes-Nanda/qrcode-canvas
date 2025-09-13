@@ -1,15 +1,12 @@
-import { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Navigation } from '@/components/layout/Navigation';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
+import { QRGenerator } from '@/components/qr/QRGenerator';
+import { QRList } from '@/components/qr/QRList';
+import { Analytics } from '@/components/analytics/Analytics';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedFooter } from '@/components/layout/EnhancedFooter';
-import { Loader2 } from 'lucide-react';
-
-// Lazy load heavy components
-const QRGenerator = lazy(() => import('@/components/qr/QRGenerator').then(module => ({ default: module.QRGenerator })));
-const QRList = lazy(() => import('@/components/qr/QRList').then(module => ({ default: module.QRList })));
-const Analytics = lazy(() => import('@/components/analytics/Analytics').then(module => ({ default: module.Analytics })));
 
 export const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
@@ -48,16 +45,6 @@ export const Dashboard = () => {
     }
   };
 
-  // Component loading fallback
-  const ComponentLoader = () => (
-    <div className="flex items-center justify-center py-12">
-      <div className="text-center space-y-3">
-        <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-        <p className="text-sm text-muted-foreground">Loading component...</p>
-      </div>
-    </div>
-  );
-
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -68,23 +55,11 @@ export const Dashboard = () => {
           />
         );
       case 'create':
-        return (
-          <Suspense fallback={<ComponentLoader />}>
-            <QRGenerator />
-          </Suspense>
-        );
+        return <QRGenerator />;
       case 'manage':
-        return (
-          <Suspense fallback={<ComponentLoader />}>
-            <QRList />
-          </Suspense>
-        );
+        return <QRList />;
       case 'analytics':
-        return (
-          <Suspense fallback={<ComponentLoader />}>
-            <Analytics />
-          </Suspense>
-        );
+        return <Analytics />;
       default:
         return <DashboardOverview onCreateClick={() => setActiveTab('create')} onAnalyticsClick={() => setActiveTab('analytics')} />;
     }
