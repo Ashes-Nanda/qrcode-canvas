@@ -109,11 +109,12 @@ export default defineConfig(({ mode }) => ({
         // Better file names for caching
         chunkFileNames: (chunkInfo) => {
           const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId.split('/').pop().replace(/\.[^.]*$/, '')
+            ? chunkInfo.facadeModuleId.split('/').pop()?.replace(/\.[^.]*$/, '')
             : 'chunk';
           return `js/[name]-[hash].js`;
         },
         assetFileNames: (assetInfo) => {
+          if (!assetInfo.name) return `assets/[name]-[hash][extname]`;
           const info = assetInfo.name.split('.');
           const extType = info[info.length - 1];
           if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType)) {

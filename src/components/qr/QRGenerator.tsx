@@ -735,7 +735,7 @@ export const QRGenerator = () => {
       pdf.setFontSize(10);
       pdf.setTextColor(128);
       const dateStr = new Date().toLocaleString();
-      pdf.text(`Generated on ${dateStr} by QRCode Canvas Pro`, 20, pageHeight - 20);
+      pdf.text(`Generated on ${dateStr} by CanvasQR`, 20, pageHeight - 20);
       
       // Save the PDF
       const filename = title ? `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_qr.pdf` : 'qr_code.pdf';
@@ -925,7 +925,7 @@ export const QRGenerator = () => {
     const event = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//QRCode Canvas Pro//Event//EN',
+      'PRODID:-//CanvasQR//Event//EN',
       'BEGIN:VEVENT',
       `SUMMARY:${data.title}`,
       data.description ? `DESCRIPTION:${data.description}` : '',

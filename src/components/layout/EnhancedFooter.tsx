@@ -37,7 +37,7 @@ export const EnhancedFooter = () => {
                 <QrCode className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="font-bold text-lg">QRCode Canvas Pro</div>
+                <div className="font-bold text-lg">CanvasQR</div>
                 <div className="text-sm text-muted-foreground">Professional QR Solutions</div>
               </div>
             </div>
@@ -110,7 +110,7 @@ export const EnhancedFooter = () => {
         <div className="mt-16 pt-8 border-t border-gray-200">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="text-sm text-gray-500">
-              © 2025 QRCode Canvas Pro. All rights reserved.
+              © 2025 CanvasQR. All rights reserved.
             </div>
             <div className="flex flex-wrap gap-6 text-sm">
               {linksLegal.map((link, i) => (

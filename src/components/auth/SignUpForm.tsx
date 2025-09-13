@@ -50,7 +50,7 @@ export const SignUpForm = () => {
 
       toast({
         title: "Account created!",
-        description: "Welcome to QRCode Canvas Pro. You can now start creating QR codes.",
+        description: "Welcome to CanvasQR. You can now start creating QR codes.",
       });
     } catch (error: any) {
       toast({

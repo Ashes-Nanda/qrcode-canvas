@@ -87,7 +87,7 @@ export const AuthModal = ({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
 
       toast({
         title: "Account created!",
-        description: "Welcome to QRCode Canvas Pro. You can now start creating QR codes.",
+        description: "Welcome to CanvasQR. You can now start creating QR codes.",
       });
       
       onClose();
@@ -119,8 +119,8 @@ export const AuthModal = ({ isOpen, onClose, defaultMode = 'login' }: AuthModalP
           </DialogTitle>
           <DialogDescription className="text-center text-gray-600">
             {mode === 'login' 
-              ? 'Sign in to your QRCode Canvas Pro account' 
-              : 'Create your QRCode Canvas Pro account'
+              ? 'Sign in to your CanvasQR account' 
+              : 'Create your CanvasQR account'
             }
           </DialogDescription>
         </DialogHeader>

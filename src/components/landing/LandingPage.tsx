@@ -95,7 +95,7 @@ export const LandingPage = () => {
               <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
                 <QrCode className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-foreground">QRCode Canvas Pro</span>
+              <span className="text-xl font-bold text-foreground">CanvasQR</span>
             </div>
             <Button 
               onClick={() => {
@@ -121,7 +121,7 @@ export const LandingPage = () => {
                   <span className="text-primary"> Make Every Scan Count.</span>
                 </h1>
                 <p className="text-xl text-gray-600 leading-relaxed">
-                  QRCode Canvas Pro empowers professionals and businesses to create, manage, and track QR codes with unbeatable analytics and security. Serve every customer—no matter where or how they scan.
+                  CanvasQR empowers professionals and businesses to create, manage, and track QR codes with unbeatable analytics and security. Serve every customer—no matter where or how they scan.
                 </p>
               </div>
 
@@ -334,7 +334,7 @@ export const LandingPage = () => {
           <Card className="rounded-2xl shadow-lg bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
             <CardContent className="p-12">
               <blockquote className="text-2xl font-medium text-foreground mb-6 leading-relaxed">
-                "QRCode Canvas Pro helped us increase in-store engagement by 43% while keeping data rock-solid secure."
+                "CanvasQR helped us increase in-store engagement by 43% while keeping data rock-solid secure."
               </blockquote>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
@@ -360,7 +360,7 @@ export const LandingPage = () => {
             Generate your first professional QR code in seconds and join over 5,000 businesses achieving smarter, safer, and more effective engagement!
           </p>
           <p className="text-lg text-gray-700 font-medium">
-            Experience the difference with QRCode Canvas Pro and never settle for ordinary QR codes again
+            Experience the difference with CanvasQR and never settle for ordinary QR codes again
           </p>
           <Button 
             size="lg" 

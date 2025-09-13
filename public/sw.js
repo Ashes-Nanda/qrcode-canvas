@@ -1,5 +1,5 @@
-// Service Worker for QR Code Canvas Pro
-const CACHE_NAME = 'qrcode-canvas-pro-v1';
+// Service Worker for CanvasQR
+const CACHE_NAME = 'canvasqr-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -95,7 +95,7 @@ self.addEventListener('push', (event) => {
     };
     
     event.waitUntil(
-      self.registration.showNotification('QR Code Canvas Pro', options)
+      self.registration.showNotification('CanvasQR', options)
     );
   }
 });

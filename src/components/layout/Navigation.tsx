@@ -78,7 +78,7 @@ export const Navigation = ({
               <QrCode className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-foreground">
-              QRCode Canvas Pro
+              CanvasQR
             </span>
           </div>
 
